@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Guitar, Moon, Sun, Plus, Library, RefreshCw, Edit, Trash2 } from 'lucide-react';
+import { Guitar, Moon, Sun, Plus, Library, RefreshCw, Edit, Trash2, Download, Upload } from 'lucide-react';
 import { CustomChordBuilder } from './components/CustomChordBuilder';
 import Fretboard from './components/Fretboard';
 
@@ -195,6 +195,69 @@ const ChordLibrary: React.FC = () => {
     setFilterVoicing('');
   };
 
+  const exportChords = () => {
+    try {
+      const chords = localStorage.getItem('customChords') || '[]';
+      const blob = new Blob([chords], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `guitar-chords-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      alert('Chords exported successfully!');
+    } catch (error) {
+      console.error('Export failed:', error);
+      alert('Failed to export chords. Please try again.');
+    }
+  };
+
+  const importChords = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const importedChords = JSON.parse(content);
+        
+        if (!Array.isArray(importedChords)) {
+          throw new Error('Invalid file format');
+        }
+
+        // Validate chord structure
+        const validChords = importedChords.filter((chord: any) => 
+          chord.id && chord.name && chord.frets && chord.frets.length === 6
+        );
+
+        if (validChords.length === 0) {
+          throw new Error('No valid chords found in file');
+        }
+
+        // Merge with existing chords (avoid duplicates by ID)
+        const existingChords = JSON.parse(localStorage.getItem('customChords') || '[]');
+        const existingIds = new Set(existingChords.map((c: any) => c.id));
+        const newChords = validChords.filter((chord: any) => !existingIds.has(chord.id));
+        
+        const mergedChords = [...existingChords, ...newChords];
+        localStorage.setItem('customChords', JSON.stringify(mergedChords));
+        setCustomChords(mergedChords);
+        
+        alert(`Successfully imported ${newChords.length} new chords!`);
+      } catch (error) {
+        console.error('Import failed:', error);
+        alert('Failed to import chords. Please check the file format.');
+      }
+    };
+    reader.readAsText(file);
+    
+    // Reset the input
+    event.target.value = '';
+  };
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
       <div className="flex items-center justify-between mb-6">
@@ -209,13 +272,31 @@ const ChordLibrary: React.FC = () => {
             )}
           </p>
         </div>
-        <button
-          onClick={refreshChords}
-          className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
-          title="Refresh chords"
-        >
-          <RefreshCw className="w-5 h-5" />
-        </button>
+        <div className="flex space-x-2">
+          <button
+            onClick={exportChords}
+            className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-800 transition-colors duration-200"
+            title="Export chords to file"
+          >
+            <Download className="w-5 h-5" />
+          </button>
+          <label className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200 cursor-pointer">
+            <Upload className="w-5 h-5" />
+            <input
+              type="file"
+              accept=".json"
+              onChange={importChords}
+              className="hidden"
+            />
+          </label>
+          <button
+            onClick={refreshChords}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+            title="Refresh chords"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+        </div>
       </div>
       
       {customChords.length === 0 ? (
