@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Guitar, Moon, Sun, Plus, Library, RefreshCw, Edit, Trash2, Download, Upload } from 'lucide-react';
+import { Guitar, Moon, Sun, Plus, Library, RefreshCw, Edit, Trash2, Download, Upload, Music } from 'lucide-react';
 import { CustomChordBuilder } from './components/CustomChordBuilder';
 import Fretboard from './components/Fretboard';
+import guitarIcon from './guitar.jpg';
 
 function App() {
   const [darkMode, setDarkMode] = useState(false);
@@ -31,7 +32,8 @@ function App() {
 
   const tabs = [
     { id: 'add', name: 'Add Chord', icon: Plus },
-    { id: 'library', name: 'Chord Library', icon: Library }
+    { id: 'library', name: 'Chord Library', icon: Library },
+    { id: 'keys', name: 'Keys', icon: Music }
   ];
 
   return (
@@ -41,9 +43,7 @@ function App() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
-              <div className="bg-teal-600 dark:bg-teal-500 p-2 rounded-lg">
-                <Guitar className="w-6 h-6 text-white" />
-              </div>
+              <img src={guitarIcon} alt="Guitar" className="w-10 h-10 rounded" />
               <h1 className="text-xl font-bold text-teal-900 dark:text-teal-100">Custom Chord Builder</h1>
             </div>
             
@@ -95,6 +95,12 @@ function App() {
         {activeTab === 'library' && (
           <div>
             <ChordLibrary />
+          </div>
+        )}
+
+        {activeTab === 'keys' && (
+          <div>
+            <KeySelector />
           </div>
         )}
       </div>
@@ -401,6 +407,316 @@ const ChordLibrary: React.FC = () => {
           onSave={saveEditedChord}
           onClose={closeEditModal}
         />
+      )}
+    </div>
+  );
+};
+
+// Key Selector Component
+const KeySelector: React.FC = () => {
+  const [selectedKey, setSelectedKey] = useState('');
+  const [filterRoot, setFilterRoot] = useState('');
+  const [filterQuality, setFilterQuality] = useState('');
+  const [filterVoicing, setFilterVoicing] = useState('');
+  const [customChords, setCustomChords] = useState<any[]>(() => {
+    const saved = localStorage.getItem('customChords');
+    return saved ? JSON.parse(saved) : [];
+  });
+
+  // Refresh chords when localStorage changes
+  const refreshChords = () => {
+    const saved = localStorage.getItem('customChords');
+    setCustomChords(saved ? JSON.parse(saved) : []);
+  };
+
+  // Listen for storage events (when chords are added from other tab)
+  React.useEffect(() => {
+    const handleStorageChange = () => {
+      refreshChords();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const QUALITIES = ['Major', 'Minor', 'Maj7', 'Min7', 'Diminished', 'Augmented', 'Sus2', 'Sus4', '7', '9', '13', 'Power Chord', 'Custom'];
+  const VOICINGS = ['Open', 'Barre', 'Power', 'Triad', 'Custom'];
+
+  // Define musical keys and their chord progressions
+  const musicalKeys = {
+    // Major Keys
+    'C': ['C', 'Dm', 'Em', 'F', 'G', 'Am', 'Bdim'],
+    'G': ['G', 'Am', 'Bm', 'C', 'D', 'Em', 'F#dim'],
+    'D': ['D', 'Em', 'F#m', 'G', 'A', 'Bm', 'C#dim'],
+    'A': ['A', 'Bm', 'C#m', 'D', 'E', 'F#m', 'G#dim'],
+    'E': ['E', 'F#m', 'G#m', 'A', 'B', 'C#m', 'D#dim'],
+    'B': ['B', 'C#m', 'D#m', 'E', 'F#', 'G#m', 'A#dim'],
+    'F#': ['F#', 'G#m', 'A#m', 'B', 'C#', 'D#m', 'E#dim'],
+    'C#': ['C#', 'D#m', 'E#m', 'F#', 'G#', 'A#m', 'B#dim'],
+    'F': ['F', 'Gm', 'Am', 'Bb', 'C', 'Dm', 'Edim'],
+    'Bb': ['Bb', 'Cm', 'Dm', 'Eb', 'F', 'Gm', 'Adim'],
+    'Eb': ['Eb', 'Fm', 'Gm', 'Ab', 'Bb', 'Cm', 'Ddim'],
+    'Ab': ['Ab', 'Bbm', 'Cm', 'Db', 'Eb', 'Fm', 'Gdim'],
+    'Db': ['Db', 'Ebm', 'Fm', 'Gb', 'Ab', 'Bbm', 'Cdim'],
+    'Gb': ['Gb', 'Abm', 'Bbm', 'Cb', 'Db', 'Ebm', 'Fdim'],
+    'Cb': ['Cb', 'Dbm', 'Ebm', 'Fb', 'Gb', 'Abm', 'Bbdim'],
+    
+    // Minor Keys (Natural Minor)
+    'Am': ['Am', 'Bdim', 'C', 'Dm', 'Em', 'F', 'G'],
+    'Em': ['Em', 'F#dim', 'G', 'Am', 'Bm', 'C', 'D'],
+    'Bm': ['Bm', 'C#dim', 'D', 'Em', 'F#m', 'G', 'A'],
+    'F#m': ['F#m', 'G#dim', 'A', 'Bm', 'C#m', 'D', 'E'],
+    'C#m': ['C#m', 'D#dim', 'E', 'F#m', 'G#m', 'A', 'B'],
+    'G#m': ['G#m', 'A#dim', 'B', 'C#m', 'D#m', 'E', 'F#'],
+    'D#m': ['D#m', 'E#dim', 'F#', 'G#m', 'A#m', 'B', 'C#'],
+    'A#m': ['A#m', 'B#dim', 'C#', 'D#m', 'E#m', 'F#', 'G#'],
+    'Dm': ['Dm', 'Edim', 'F', 'Gm', 'Am', 'Bb', 'C'],
+    'Gm': ['Gm', 'Adim', 'Bb', 'Cm', 'Dm', 'Eb', 'F'],
+    'Cm': ['Cm', 'Ddim', 'Eb', 'Fm', 'Gm', 'Ab', 'Bb'],
+    'Fm': ['Fm', 'Gdim', 'Ab', 'Bbm', 'Cm', 'Db', 'Eb'],
+    'Bbm': ['Bbm', 'Cdim', 'Db', 'Ebm', 'Fm', 'Gb', 'Ab'],
+    'Ebm': ['Ebm', 'Fdim', 'Gb', 'Abm', 'Bbm', 'Cb', 'Db'],
+    'Abm': ['Abm', 'Bbdim', 'Cb', 'Dbm', 'Ebm', 'Fb', 'Gb']
+  };
+
+  // Get chords that match the selected key
+  const getChordsInKey = () => {
+    if (!selectedKey || !musicalKeys[selectedKey as keyof typeof musicalKeys]) {
+      return [];
+    }
+
+    const keyChords = musicalKeys[selectedKey as keyof typeof musicalKeys];
+    const chordsInKey: any[] = [];
+
+    keyChords.forEach(chordName => {
+      // Find chords that match this chord name
+      const matchingChords = customChords.filter(chord => {
+        // Handle different naming conventions
+        const chordDisplayName = chord.name.toLowerCase();
+        const targetChordName = chordName.toLowerCase();
+        
+        // Direct match
+        if (chordDisplayName === targetChordName) {
+          return true;
+        }
+        
+        // Handle sharps and flats
+        const normalizedChordName = chordDisplayName
+          .replace('c#', 'db')
+          .replace('d#', 'eb')
+          .replace('f#', 'gb')
+          .replace('g#', 'ab')
+          .replace('a#', 'bb');
+        
+        const normalizedTarget = targetChordName
+          .replace('c#', 'db')
+          .replace('d#', 'eb')
+          .replace('f#', 'gb')
+          .replace('g#', 'ab')
+          .replace('a#', 'bb');
+        
+        return normalizedChordName === normalizedTarget;
+      });
+      
+      chordsInKey.push(...matchingChords);
+    });
+
+    // Apply additional filters
+    return chordsInKey.filter((chord) => {
+      const matchesRoot = !filterRoot || chord.rootNote === filterRoot;
+      const matchesQuality = !filterQuality || chord.chordQuality === filterQuality;
+      const matchesVoicing = !filterVoicing || chord.chordVoicing === filterVoicing;
+      return matchesRoot && matchesQuality && matchesVoicing;
+    });
+  };
+
+  const chordsInKey = getChordsInKey();
+
+  const clearFilters = () => {
+    setFilterRoot('');
+    setFilterQuality('');
+    setFilterVoicing('');
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Key Selector
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Choose a musical key to see which chords from your library are available in that key.
+          </p>
+        </div>
+        <button
+          onClick={refreshChords}
+          className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+          title="Refresh chords"
+        >
+          <RefreshCw className="w-5 h-5" />
+        </button>
+      </div>
+
+      <div className="mb-6">
+        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+          Select Key
+        </label>
+        <select
+          value={selectedKey}
+          onChange={(e) => setSelectedKey(e.target.value)}
+          className="w-full md:w-64 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+        >
+          <option value="">Choose a key...</option>
+          {Object.keys(musicalKeys).map(key => (
+            <option key={key} value={key}>
+              {key} {key.endsWith('m') ? 'Minor' : 'Major'}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      {selectedKey && (
+        <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <select
+            value={filterRoot}
+            onChange={(e) => setFilterRoot(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          >
+            <option value="">All roots</option>
+            {NOTES.map((n) => (
+              <option key={n} value={n}>{n}</option>
+            ))}
+          </select>
+          <select
+            value={filterQuality}
+            onChange={(e) => setFilterQuality(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          >
+            <option value="">All qualities</option>
+            {QUALITIES.map((q) => (
+              <option key={q} value={q}>{q}</option>
+            ))}
+          </select>
+          <div className="flex space-x-2">
+            <select
+              value={filterVoicing}
+              onChange={(e) => setFilterVoicing(e.target.value)}
+              className="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value="">All voicings</option>
+              {VOICINGS.map((v) => (
+                <option key={v} value={v}>{v}</option>
+              ))}
+            </select>
+            <button
+              onClick={clearFilters}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+            >
+              Clear
+            </button>
+          </div>
+        </div>
+      )}
+
+      {selectedKey && (
+        <div>
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2">
+              Chords in {selectedKey} {selectedKey.endsWith('m') ? 'Minor' : 'Major'}
+            </h3>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
+              {chordsInKey.length} chord{chordsInKey.length !== 1 ? 's' : ''} available from your library
+              {(filterRoot || filterQuality || filterVoicing) && (
+                <span className="text-teal-600 dark:text-teal-400"> (filtered)</span>
+              )}
+            </p>
+            
+            {/* Show the chord progression */}
+            <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+              <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Chord Progression:</h4>
+              <div className="flex flex-wrap gap-2">
+                {musicalKeys[selectedKey as keyof typeof musicalKeys].map((chord, index) => {
+                  const romanNumerals = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
+                  const hasChords = customChords.some(c => {
+                    const chordDisplayName = c.name.toLowerCase();
+                    const targetChordName = chord.toLowerCase();
+                    return chordDisplayName === targetChordName || 
+                           chordDisplayName.replace('c#', 'db').replace('d#', 'eb').replace('f#', 'gb').replace('g#', 'ab').replace('a#', 'bb') === 
+                           targetChordName.replace('c#', 'db').replace('d#', 'eb').replace('f#', 'gb').replace('g#', 'ab').replace('a#', 'bb');
+                  });
+                  
+                  return (
+                    <div
+                      key={chord}
+                      className={`px-3 py-1 rounded text-sm font-medium ${
+                        hasChords 
+                          ? 'bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200' 
+                          : 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
+                      }`}
+                    >
+                      <div className="text-xs text-gray-500 dark:text-gray-400">{romanNumerals[index]}</div>
+                      <div>{chord}</div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          </div>
+
+          {chordsInKey.length === 0 ? (
+            <div className="text-center py-12">
+              <div className="text-6xl mb-4">🎵</div>
+              <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+                {filterRoot || filterQuality || filterVoicing 
+                  ? 'No chords match your filters' 
+                  : `No chords found in ${selectedKey} ${selectedKey.endsWith('m') ? 'Minor' : 'Major'}`
+                }
+              </h4>
+              <p className="text-gray-500 dark:text-gray-400">
+                {filterRoot || filterQuality || filterVoicing 
+                  ? 'Try adjusting your filters or add more chords to your library.'
+                  : `Add some chords to your library that match the ${selectedKey} ${selectedKey.endsWith('m') ? 'Minor' : 'Major'} scale!`
+                }
+              </p>
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+              {chordsInKey.map(chord => (
+                <div
+                  key={chord.id}
+                  className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700"
+                >
+                  <div className="mb-3">
+                    <h4 className="font-medium text-gray-900 dark:text-white">{chord.name}</h4>
+                    <div className="text-xs text-gray-500 dark:text-gray-400">
+                      {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${chord.rootNote} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
+                    </div>
+                  </div>
+                  
+                  <div className="mb-3">
+                    <Fretboard 
+                      frets={chord.frets}
+                      fingering={chord.fingering}
+                      position={chord.position}
+                    />
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {!selectedKey && (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🎼</div>
+          <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">Select a key to get started</h4>
+          <p className="text-gray-500 dark:text-gray-400">
+            Choose a musical key from the dropdown above to see which chords from your library are available in that key.
+          </p>
+        </div>
       )}
     </div>
   );
