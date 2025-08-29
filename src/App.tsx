@@ -7,6 +7,7 @@ import guitarIcon from './guitar.jpg';
 function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState('add');
+  const [capoFret, setCapoFret] = useState(0);
 
   // Initialize dark mode from localStorage
   useEffect(() => {
@@ -122,7 +123,7 @@ function App() {
 
         {activeTab === 'jam' && (
           <div>
-            <JamWorkspace />
+            <JamWorkspace capoFret={capoFret} setCapoFret={setCapoFret} />
           </div>
         )}
 
@@ -253,6 +254,49 @@ const ChordLibrary: React.FC = () => {
     return aName.localeCompare(bName);
   });
 
+  const getCapoChord = (chordName: string, capoFret: number) => {
+    if (capoFret === 0) return chordName;
+    
+    const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    
+    // Extract the root note from the chord name
+    let rootNote = '';
+    let chordQuality = '';
+    
+    // Handle different chord naming patterns
+    if (chordName.includes('maj') || chordName.includes('Maj')) {
+      rootNote = chordName.replace('maj', '').replace('Maj', '');
+      chordQuality = 'maj';
+    } else if (chordName.includes('m') || chordName.includes('min')) {
+      rootNote = chordName.replace('m', '').replace('min', '');
+      chordQuality = 'm';
+    } else if (chordName.includes('dim')) {
+      rootNote = chordName.replace('dim', '');
+      chordQuality = 'dim';
+    } else if (chordName.includes('aug')) {
+      rootNote = chordName.replace('aug', '');
+      chordQuality = 'aug';
+    } else if (chordName.includes('7')) {
+      rootNote = chordName.replace('7', '');
+      chordQuality = '7';
+    } else {
+      // Assume major chord if no quality specified
+      rootNote = chordName;
+      chordQuality = '';
+    }
+    
+    // Find the root note index
+    const rootIndex = NOTES.indexOf(rootNote);
+    if (rootIndex === -1) return chordName; // Can't determine, return original
+    
+    // Calculate new root note with capo
+    const newRootIndex = (rootIndex + capoFret) % 12;
+    const newRootNote = NOTES[newRootIndex];
+    
+    // Reconstruct chord name
+    return newRootNote + chordQuality;
+  };
+
   const clearFilters = () => {
     setSearchQuery('');
     setFilterRoot('');
@@ -349,47 +393,49 @@ const ChordLibrary: React.FC = () => {
   };
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
-            Chord Library
-          </h2>
-          <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-            {customChords.length} total chord{customChords.length !== 1 ? 's' : ''}
-            {filteredChords.length !== customChords.length && (
-              <span> • {filteredChords.length} filtered result{filteredChords.length !== 1 ? 's' : ''}</span>
-            )}
-          </p>
+    <>
+      <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+        <div className="flex items-center justify-between mb-6">
+          <div>
+            <h2 className="text-2xl font-bold text-gray-900 dark:text-white">
+              Chord Library
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
+              {customChords.length} total chord{customChords.length !== 1 ? 's' : ''}
+              {filteredChords.length !== customChords.length && (
+                <span> • {filteredChords.length} filtered result{filteredChords.length !== 1 ? 's' : ''}</span>
+              )}
+            </p>
+          </div>
+          <div className="flex space-x-2">
+              <button
+                onClick={exportChords}
+                className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-800 transition-colors duration-200"
+                title="Export chords to file"
+              >
+                <Download className="w-5 h-5" />
+              </button>
+              <label className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200 cursor-pointer">
+                <Upload className="w-5 h-5" />
+                <input
+                  type="file"
+                  accept=".json"
+                  onChange={importChords}
+                  className="hidden"
+                />
+              </label>
+              <button
+                onClick={refreshChords}
+                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+                title="Refresh chords"
+              >
+                <RefreshCw className="w-5 h-5" />
+              </button>
+            </div>
+          </div>
         </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={exportChords}
-            className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-800 transition-colors duration-200"
-            title="Export chords to file"
-          >
-            <Download className="w-5 h-5" />
-          </button>
-          <label className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200 cursor-pointer">
-            <Upload className="w-5 h-5" />
-            <input
-              type="file"
-              accept=".json"
-              onChange={importChords}
-              className="hidden"
-            />
-          </label>
-          <button
-            onClick={refreshChords}
-            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
-            title="Refresh chords"
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
-        </div>
-      </div>
-      
-      {customChords.length === 0 ? (
+        
+        {customChords.length === 0 ? (
         <div className="text-center py-12">
           <div className="text-6xl mb-4">🎸</div>
           <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No custom chords yet</h4>
@@ -397,7 +443,7 @@ const ChordLibrary: React.FC = () => {
         </div>
       ) : (
         <>
-          <div className="mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
+          <div className="mt-6 mb-4 grid grid-cols-1 md:grid-cols-4 gap-3">
             <input
               type="text"
               value={searchQuery}
@@ -508,7 +554,7 @@ const ChordLibrary: React.FC = () => {
         isVisible={showToast}
         onClose={() => setShowToast(false)}
       />
-    </div>
+    </>
   );
 };
 
@@ -598,6 +644,29 @@ const KeySelector: React.FC = () => {
         
         // Direct match
         if (chordDisplayName === targetChordName) {
+          return true;
+        }
+        
+        // Extract root note and quality from chord display name
+        const chordRoot = chord.rootNote?.toLowerCase() || '';
+        const chordQuality = chord.chordQuality?.toLowerCase() || '';
+        
+        // Extract root note and quality from target chord name
+        let targetRoot = targetChordName;
+        let targetQuality = '';
+        
+        if (targetChordName.endsWith('m')) {
+          targetRoot = targetChordName.slice(0, -1);
+          targetQuality = 'minor';
+        } else if (targetChordName.endsWith('dim')) {
+          targetRoot = targetChordName.slice(0, -3);
+          targetQuality = 'diminished';
+        } else {
+          targetQuality = 'major';
+        }
+        
+        // Match root note and quality
+        if (chordRoot === targetRoot && chordQuality === targetQuality) {
           return true;
         }
         
@@ -849,6 +918,14 @@ const SavedJamsTab: React.FC = () => {
   const loadJam = (jam: any) => {
     // Load the jam into the jam workspace
     localStorage.setItem('jamWorkspace', JSON.stringify(jam.chords));
+    
+    // Also save the capo state to localStorage so the Jam tab can restore it
+    if (jam.capoFret !== undefined) {
+      localStorage.setItem('jamCapoFret', jam.capoFret.toString());
+    } else {
+      localStorage.removeItem('jamCapoFret');
+    }
+    
     setToastMessage(`Loaded jam "${jam.name}" into Jam workspace!`);
     setShowToast(true);
   };
@@ -1320,6 +1397,7 @@ const TheoryTab: React.FC = () => {
   const [selectedPosition, setSelectedPosition] = useState(1);
   const [showAllPositions, setShowAllPositions] = useState(false);
   const [customChords, setCustomChords] = useState<any[]>([]);
+  const [capoFret, setCapoFret] = useState(0);
 
   const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   
@@ -1469,18 +1547,65 @@ const TheoryTab: React.FC = () => {
     if (!key || !musicalKeys[key as keyof typeof musicalKeys]) return [];
     
     const keyChords = musicalKeys[key as keyof typeof musicalKeys];
-    
-    return customChords.filter(chord => {
-      // Normalize chord names for comparison
-      const chordName = chord.name || '';
-      const normalizedChordName = chordName.replace(/[#♯]/g, '#').replace(/[b♭]/g, 'b');
-      
-      return keyChords.some(keyChord => {
-        const normalizedKeyChord = keyChord.replace(/[#♯]/g, '#').replace(/[b♭]/g, 'b');
-        return normalizedChordName.includes(normalizedKeyChord) || 
-               normalizedKeyChord.includes(normalizedChordName);
+    const chordsInKey: any[] = [];
+
+    keyChords.forEach(chordName => {
+      // Find chords that match this chord name
+      const matchingChords = customChords.filter(chord => {
+        // Handle different naming conventions
+        const chordDisplayName = chord.name.toLowerCase();
+        const targetChordName = chordName.toLowerCase();
+        
+        // Direct match
+        if (chordDisplayName === targetChordName) {
+          return true;
+        }
+        
+        // Extract root note and quality from chord display name
+        const chordRoot = chord.rootNote?.toLowerCase() || '';
+        const chordQuality = chord.chordQuality?.toLowerCase() || '';
+        
+        // Extract root note and quality from target chord name
+        let targetRoot = targetChordName;
+        let targetQuality = '';
+        
+        if (targetChordName.endsWith('m')) {
+          targetRoot = targetChordName.slice(0, -1);
+          targetQuality = 'minor';
+        } else if (targetChordName.endsWith('dim')) {
+          targetRoot = targetChordName.slice(0, -3);
+          targetQuality = 'diminished';
+        } else {
+          targetQuality = 'major';
+        }
+        
+        // Match root note and quality
+        if (chordRoot === targetRoot && chordQuality === targetQuality) {
+          return true;
+        }
+        
+        // Handle sharps and flats
+        const normalizedChordName = chordDisplayName
+          .replace('c#', 'db')
+          .replace('d#', 'eb')
+          .replace('f#', 'gb')
+          .replace('g#', 'ab')
+          .replace('a#', 'bb');
+        
+        const normalizedTarget = targetChordName
+          .replace('c#', 'db')
+          .replace('d#', 'eb')
+          .replace('f#', 'gb')
+          .replace('g#', 'ab')
+          .replace('a#', 'bb');
+        
+        return normalizedChordName === normalizedTarget;
       });
+      
+      chordsInKey.push(...matchingChords);
     });
+
+    return chordsInKey;
   };
 
   const renderFretboard = (root: string, scaleType: string, position: number) => {
@@ -1763,7 +1888,7 @@ const TheoryTab: React.FC = () => {
 };
 
 // Jam Workspace Component
-const JamWorkspace: React.FC = () => {
+const JamWorkspace: React.FC<{ capoFret: number; setCapoFret: (fret: number) => void }> = ({ capoFret, setCapoFret }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
   const [selectedChords, setSelectedChords] = useState<any[]>(() => {
@@ -1794,6 +1919,24 @@ const JamWorkspace: React.FC = () => {
     window.addEventListener('storage', handleStorageChange);
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
+
+  // Listen for changes to jam workspace and restore capo state if available
+  React.useEffect(() => {
+    const handleJamWorkspaceChange = () => {
+      const savedCapo = localStorage.getItem('jamCapoFret');
+      if (savedCapo !== null) {
+        setCapoFret(parseInt(savedCapo));
+        localStorage.removeItem('jamCapoFret'); // Clean up after restoring
+      }
+    };
+
+    // Check for capo state when component mounts
+    handleJamWorkspaceChange();
+
+    // Listen for storage events
+    window.addEventListener('storage', handleJamWorkspaceChange);
+    return () => window.removeEventListener('storage', handleJamWorkspaceChange);
+  }, [setCapoFret]);
 
   const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
   const QUALITIES = ['Major', 'Minor', 'Maj7', 'Min7', 'Diminished', 'Augmented', 'Sus2', 'Sus4', '7', '9', '13', 'Power Chord', 'Custom'];
@@ -1859,6 +2002,7 @@ const JamWorkspace: React.FC = () => {
   const clearWorkspace = () => {
     setSelectedChords([]);
     localStorage.removeItem('jamWorkspace');
+    setCapoFret(0); // Reset capo to 0 (no capo)
   };
 
   const saveJam = () => {
@@ -1879,6 +2023,7 @@ const JamWorkspace: React.FC = () => {
       id: Date.now().toString(),
       name: jamName.trim(),
       chords: selectedChords,
+      capoFret: capoFret,
       createdAt: new Date().toISOString()
     };
 
@@ -1894,6 +2039,12 @@ const JamWorkspace: React.FC = () => {
   const loadJam = (jam: any) => {
     setSelectedChords(jam.chords);
     localStorage.setItem('jamWorkspace', JSON.stringify(jam.chords));
+    
+    // Restore capo state if it was saved with the jam
+    if (jam.capoFret !== undefined) {
+      setCapoFret(jam.capoFret);
+    }
+    
     setToastMessage(`Loaded jam "${jam.name}"`);
     setShowToast(true);
   };
@@ -1904,6 +2055,49 @@ const JamWorkspace: React.FC = () => {
     localStorage.setItem('savedJams', JSON.stringify(updatedJams));
     setToastMessage('Jam deleted successfully');
     setShowToast(true);
+  };
+
+  const getCapoChord = (chordName: string, capoFret: number) => {
+    if (capoFret === 0) return chordName;
+    
+    const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+    
+    // Extract the root note from the chord name
+    let rootNote = '';
+    let chordQuality = '';
+    
+    // Handle different chord naming patterns
+    if (chordName.includes('maj') || chordName.includes('Maj')) {
+      rootNote = chordName.replace('maj', '').replace('Maj', '');
+      chordQuality = 'maj';
+    } else if (chordName.includes('m') || chordName.includes('min')) {
+      rootNote = chordName.replace('m', '').replace('min', '');
+      chordQuality = 'm';
+    } else if (chordName.includes('dim')) {
+      rootNote = chordName.replace('dim', '');
+      chordQuality = 'dim';
+    } else if (chordName.includes('aug')) {
+      rootNote = chordName.replace('aug', '');
+      chordQuality = 'aug';
+    } else if (chordName.includes('7')) {
+      rootNote = chordName.replace('7', '');
+      chordQuality = '7';
+    } else {
+      // Assume major chord if no quality specified
+      rootNote = chordName;
+      chordQuality = '';
+    }
+    
+    // Find the root note index
+    const rootIndex = NOTES.indexOf(rootNote);
+    if (rootIndex === -1) return chordName; // Can't determine, return original
+    
+    // Calculate new root note with capo
+    const newRootIndex = (rootIndex + capoFret) % 12;
+    const newRootNote = NOTES[newRootIndex];
+    
+    // Reconstruct chord name
+    return newRootNote + chordQuality;
   };
 
   const moveChordInWorkspace = (fromIndex: number, toIndex: number) => {
@@ -1927,27 +2121,53 @@ const JamWorkspace: React.FC = () => {
             Search for chords and add them to your temporary workspace for jamming.
           </p>
         </div>
-        <div className="flex space-x-2">
-          <button
-            onClick={() => setShowSaveModal(true)}
-            disabled={selectedChords.length === 0}
-            className="px-3 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
-          >
-            Save Jam
-          </button>
-          <button
-            onClick={clearWorkspace}
-            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
-          >
-            Clear All
-          </button>
-          <button
-            onClick={refreshChords}
-            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
-            title="Refresh chords"
-          >
-            <RefreshCw className="w-5 h-5" />
-          </button>
+        <div className="flex items-center space-x-4">
+          {/* Capo Controls */}
+          <div className="flex items-center space-x-2">
+            <label className="text-sm font-medium text-gray-700 dark:text-gray-300">
+              Capo:
+            </label>
+            <select
+              value={capoFret}
+              onChange={(e) => setCapoFret(Number(e.target.value))}
+              className="px-2 py-1 border border-gray-300 dark:border-gray-600 rounded text-sm bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+            >
+              <option value={0}>None</option>
+              <option value={1}>1st fret</option>
+              <option value={2}>2nd fret</option>
+              <option value={3}>3rd fret</option>
+              <option value={4}>4th fret</option>
+              <option value={5}>5th fret</option>
+              <option value={6}>6th fret</option>
+              <option value={7}>7th fret</option>
+              <option value={8}>8th fret</option>
+              <option value={9}>9th fret</option>
+              <option value={10}>10th fret</option>
+              <option value={11}>11th fret</option>
+            </select>
+          </div>
+          <div className="flex space-x-2">
+            <button
+              onClick={() => setShowSaveModal(true)}
+              disabled={selectedChords.length === 0}
+              className="px-3 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+            >
+              Save Jam
+            </button>
+            <button
+              onClick={clearWorkspace}
+              className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+            >
+              Clear All
+            </button>
+            <button
+              onClick={refreshChords}
+              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+              title="Refresh chords"
+            >
+              <RefreshCw className="w-5 h-5" />
+            </button>
+          </div>
         </div>
       </div>
 
@@ -2027,9 +2247,21 @@ const JamWorkspace: React.FC = () => {
                   <div className="flex items-center space-x-2">
                     <span className="text-sm text-gray-500 dark:text-gray-400">#{index + 1}</span>
                     <div>
-                      <h4 className="font-medium text-gray-900 dark:text-white">{chord.name}</h4>
+                      <h4 className="font-medium text-gray-900 dark:text-white">
+                        {capoFret > 0 ? getCapoChord(chord.name, capoFret) : chord.name}
+                        {capoFret > 0 && (
+                          <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
+                            (capo {capoFret})
+                          </span>
+                        )}
+                      </h4>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
                         {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${chord.rootNote} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
+                        {capoFret > 0 && (
+                          <span className="ml-2 text-teal-600 dark:text-teal-400">
+                            → {getCapoChord(chord.rootNote + ' ' + chord.chordQuality, capoFret)}
+                          </span>
+                        )}
                       </div>
                     </div>
                   </div>
