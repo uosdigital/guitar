@@ -33,7 +33,8 @@ function App() {
   const tabs = [
     { id: 'add', name: 'Add Chord', icon: Plus },
     { id: 'library', name: 'Chord Library', icon: Library },
-    { id: 'keys', name: 'Keys', icon: Music }
+    { id: 'keys', name: 'Keys', icon: Music },
+    { id: 'jam', name: 'Jam', icon: Guitar }
   ];
 
   return (
@@ -44,7 +45,7 @@ function App() {
           <div className="flex items-center justify-between h-16">
             <div className="flex items-center space-x-3">
               <img src={guitarIcon} alt="Guitar" className="w-10 h-10 rounded" />
-              <h1 className="text-xl font-bold text-teal-900 dark:text-teal-100">Custom Chord Builder</h1>
+              <h1 className="text-xl font-bold text-teal-900 dark:text-teal-100">Corduroy</h1>
             </div>
             
             {/* Dark Mode Toggle */}
@@ -103,10 +104,45 @@ function App() {
             <KeySelector />
           </div>
         )}
+
+        {activeTab === 'jam' && (
+          <div>
+            <JamWorkspace />
+          </div>
+        )}
       </div>
     </div>
   );
 }
+
+// Toast Component
+const Toast: React.FC<{ message: string; isVisible: boolean; onClose: () => void }> = ({ message, isVisible, onClose }) => {
+  React.useEffect(() => {
+    if (isVisible) {
+      const timer = setTimeout(() => {
+        onClose();
+      }, 3000);
+      return () => clearTimeout(timer);
+    }
+  }, [isVisible, onClose]);
+
+  if (!isVisible) return null;
+
+  return (
+    <div className="fixed top-4 right-4 z-50 animate-in slide-in-from-right duration-300">
+      <div className="bg-teal-600 text-white px-4 py-3 rounded-lg shadow-lg flex items-center space-x-2">
+        <div className="w-2 h-2 bg-white rounded-full animate-pulse"></div>
+        <span className="text-sm font-medium">{message}</span>
+        <button
+          onClick={onClose}
+          className="ml-2 text-white hover:text-teal-100 transition-colors"
+        >
+          ✕
+        </button>
+      </div>
+    </div>
+  );
+};
 
 // Chord Library Component
 const ChordLibrary: React.FC = () => {
@@ -120,6 +156,8 @@ const ChordLibrary: React.FC = () => {
   const [filterRoot, setFilterRoot] = useState('');
   const [filterQuality, setFilterQuality] = useState('');
   const [filterVoicing, setFilterVoicing] = useState('');
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
 
   // Refresh chords when localStorage changes
   const refreshChords = () => {
@@ -199,6 +237,31 @@ const ChordLibrary: React.FC = () => {
     setFilterRoot('');
     setFilterQuality('');
     setFilterVoicing('');
+  };
+
+  const addChordToJam = (chord: any) => {
+    const existingJamChords = JSON.parse(localStorage.getItem('jamWorkspace') || '[]');
+    
+    // Check for duplicates based on name, frets, and position
+    const isDuplicate = existingJamChords.some((existingChord: any) => 
+      existingChord.name === chord.name &&
+      JSON.stringify(existingChord.frets) === JSON.stringify(chord.frets) &&
+      existingChord.position === chord.position
+    );
+    
+    if (isDuplicate) {
+      setToastMessage(`${chord.name} is already in your Jam workspace!`);
+      setShowToast(true);
+      return;
+    }
+    
+    const newChord = { ...chord, id: `${chord.id}-${Date.now()}` };
+    const updatedJamChords = [...existingJamChords, newChord];
+    localStorage.setItem('jamWorkspace', JSON.stringify(updatedJamChords));
+    
+    // Show toast notification
+    setToastMessage(`Added ${chord.name} to Jam workspace!`);
+    setShowToast(true);
   };
 
   const exportChords = () => {
@@ -377,13 +440,22 @@ const ChordLibrary: React.FC = () => {
                         {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${chord.rootNote} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
                       </div>
                     </div>
-                    <button
-                      onClick={() => openEditModal(chord)}
-                      className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
-                      title="Edit chord"
-                    >
-                      <Edit className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center space-x-2">
+                      <button
+                        onClick={() => addChordToJam(chord)}
+                        className="text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300 p-1 rounded hover:bg-teal-50 dark:hover:bg-teal-900/20 transition-colors"
+                        title="Add to Jam"
+                      >
+                        <Plus className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => openEditModal(chord)}
+                        className="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300 p-1 rounded hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors"
+                        title="Edit chord"
+                      >
+                        <Edit className="w-4 h-4" />
+                      </button>
+                    </div>
                   </div>
                   
                   <div className="mb-3">
@@ -408,6 +480,13 @@ const ChordLibrary: React.FC = () => {
           onClose={closeEditModal}
         />
       )}
+
+      {/* Toast Notification */}
+      <Toast
+        message={toastMessage}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </div>
   );
 };
@@ -718,6 +797,449 @@ const KeySelector: React.FC = () => {
           </p>
         </div>
       )}
+    </div>
+  );
+};
+
+// Saved Jams List Component
+const SavedJamsList: React.FC<{ onLoadJam: (jam: any) => void; onDeleteJam: (jamId: string) => void }> = ({ onLoadJam, onDeleteJam }) => {
+  const [savedJams, setSavedJams] = useState<any[]>([]);
+
+  React.useEffect(() => {
+    const jams = JSON.parse(localStorage.getItem('savedJams') || '[]');
+    setSavedJams(jams);
+  }, []);
+
+  // Listen for changes to saved jams
+  React.useEffect(() => {
+    const handleStorageChange = () => {
+      const jams = JSON.parse(localStorage.getItem('savedJams') || '[]');
+      setSavedJams(jams);
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  if (savedJams.length === 0) {
+    return (
+      <div className="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+        <div className="text-3xl mb-2">🎼</div>
+        <p className="text-gray-500 dark:text-gray-400">No saved jams yet</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {savedJams.map((jam) => (
+        <div
+          key={jam.id}
+          className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700"
+        >
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h4 className="font-medium text-gray-900 dark:text-white">{jam.name}</h4>
+              <div className="text-xs text-gray-500 dark:text-gray-400">
+                {jam.chords.length} chord{jam.chords.length !== 1 ? 's' : ''} • {new Date(jam.createdAt).toLocaleDateString()}
+              </div>
+            </div>
+            <div className="flex items-center space-x-2">
+              <button
+                onClick={() => onLoadJam(jam)}
+                className="p-1 text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300"
+                title="Load jam"
+              >
+                ↻
+              </button>
+              <button
+                onClick={() => onDeleteJam(jam.id)}
+                className="p-1 text-red-500 hover:text-red-700"
+                title="Delete jam"
+              >
+                ✕
+              </button>
+            </div>
+          </div>
+          
+          <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+            {jam.chords.slice(0, 3).map((chord: any) => chord.name).join(' • ')}
+            {jam.chords.length > 3 && ' • ...'}
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+};
+
+// Jam Workspace Component
+const JamWorkspace: React.FC = () => {
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+  const [selectedChords, setSelectedChords] = useState<any[]>(() => {
+    const saved = localStorage.getItem('jamWorkspace');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [customChords, setCustomChords] = useState<any[]>(() => {
+    const saved = localStorage.getItem('customChords');
+    return saved ? JSON.parse(saved) : [];
+  });
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
+  const [showSaveModal, setShowSaveModal] = useState(false);
+  const [jamName, setJamName] = useState('');
+
+  // Refresh chords when localStorage changes
+  const refreshChords = () => {
+    const saved = localStorage.getItem('customChords');
+    setCustomChords(saved ? JSON.parse(saved) : []);
+  };
+
+  // Listen for storage events (when chords are added from other tab)
+  React.useEffect(() => {
+    const handleStorageChange = () => {
+      refreshChords();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, []);
+
+  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const QUALITIES = ['Major', 'Minor', 'Maj7', 'Min7', 'Diminished', 'Augmented', 'Sus2', 'Sus4', '7', '9', '13', 'Power Chord', 'Custom'];
+  const VOICINGS = ['Open', 'Barre', 'Power', 'Triad', 'Custom'];
+
+  // Filter chords based on search query
+  const filteredChords = customChords.filter((chord) => {
+    const matchesQuery = searchQuery.trim().length === 0 || 
+      (chord.name || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (chord.rootNote || '').toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (chord.chordQuality || '').toLowerCase().includes(searchQuery.toLowerCase());
+    return matchesQuery;
+  });
+
+  const sortedChords = [...filteredChords].sort((a, b) => {
+    const aName = (a.name || '').toLowerCase();
+    const bName = (b.name || '').toLowerCase();
+    
+    // If both names start with the same letter, handle musical note ordering
+    if (aName[0] === bName[0]) {
+      const aHasSharp = aName.includes('#');
+      const bHasSharp = bName.includes('#');
+      
+      if (aHasSharp && !bHasSharp) {
+        return 1; // Natural note comes before sharp
+      } else if (!aHasSharp && bHasSharp) {
+        return -1; // Natural note comes before sharp
+      }
+    }
+    
+    return aName.localeCompare(bName);
+  });
+
+  const addChordToWorkspace = (chord: any) => {
+    setSelectedChords(prev => {
+      // Check for duplicates based on name, frets, and position
+      const isDuplicate = prev.some((existingChord: any) => 
+        existingChord.name === chord.name &&
+        JSON.stringify(existingChord.frets) === JSON.stringify(chord.frets) &&
+        existingChord.position === chord.position
+      );
+      
+      if (isDuplicate) {
+        setToastMessage(`${chord.name} is already in your workspace!`);
+        setShowToast(true);
+        return prev;
+      }
+      
+      const newChords = [...prev, { ...chord, id: `${chord.id}-${Date.now()}` }];
+      localStorage.setItem('jamWorkspace', JSON.stringify(newChords));
+      return newChords;
+    });
+  };
+
+  const removeChordFromWorkspace = (chordId: string) => {
+    setSelectedChords(prev => {
+      const newChords = prev.filter(chord => chord.id !== chordId);
+      localStorage.setItem('jamWorkspace', JSON.stringify(newChords));
+      return newChords;
+    });
+  };
+
+  const clearWorkspace = () => {
+    setSelectedChords([]);
+    localStorage.removeItem('jamWorkspace');
+  };
+
+  const saveJam = () => {
+    if (!jamName.trim()) {
+      setToastMessage('Please enter a name for your jam');
+      setShowToast(true);
+      return;
+    }
+
+    if (selectedChords.length === 0) {
+      setToastMessage('No chords to save');
+      setShowToast(true);
+      return;
+    }
+
+    const savedJams = JSON.parse(localStorage.getItem('savedJams') || '[]');
+    const newJam = {
+      id: Date.now().toString(),
+      name: jamName.trim(),
+      chords: selectedChords,
+      createdAt: new Date().toISOString()
+    };
+
+    const updatedJams = [...savedJams, newJam];
+    localStorage.setItem('savedJams', JSON.stringify(updatedJams));
+    
+    setToastMessage(`Jam "${jamName}" saved successfully!`);
+    setShowToast(true);
+    setShowSaveModal(false);
+    setJamName('');
+  };
+
+  const loadJam = (jam: any) => {
+    setSelectedChords(jam.chords);
+    localStorage.setItem('jamWorkspace', JSON.stringify(jam.chords));
+    setToastMessage(`Loaded jam "${jam.name}"`);
+    setShowToast(true);
+  };
+
+  const deleteJam = (jamId: string) => {
+    const savedJams = JSON.parse(localStorage.getItem('savedJams') || '[]');
+    const updatedJams = savedJams.filter((jam: any) => jam.id !== jamId);
+    localStorage.setItem('savedJams', JSON.stringify(updatedJams));
+    setToastMessage('Jam deleted successfully');
+    setShowToast(true);
+  };
+
+  const moveChordInWorkspace = (fromIndex: number, toIndex: number) => {
+    setSelectedChords(prev => {
+      const newChords = [...prev];
+      const [movedChord] = newChords.splice(fromIndex, 1);
+      newChords.splice(toIndex, 0, movedChord);
+      localStorage.setItem('jamWorkspace', JSON.stringify(newChords));
+      return newChords;
+    });
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Jam Workspace
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Search for chords and add them to your temporary workspace for jamming.
+          </p>
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={() => setShowSaveModal(true)}
+            disabled={selectedChords.length === 0}
+            className="px-3 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 disabled:bg-gray-400 disabled:cursor-not-allowed transition-colors"
+          >
+            Save Jam
+          </button>
+          <button
+            onClick={clearWorkspace}
+            className="px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-gray-50 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-100 dark:hover:bg-gray-600"
+          >
+            Clear All
+          </button>
+          <button
+            onClick={refreshChords}
+            className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+            title="Refresh chords"
+          >
+            <RefreshCw className="w-5 h-5" />
+          </button>
+        </div>
+      </div>
+
+      {/* Search Tool */}
+      <div className="mb-6">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          Search & Add Chords
+        </h3>
+        
+        <div className="relative">
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            onFocus={() => setIsSearchFocused(true)}
+            onBlur={() => setTimeout(() => setIsSearchFocused(false), 200)}
+            placeholder="Search chords by name, root note, or quality..."
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          />
+          
+          {/* Autocomplete Dropdown */}
+          {isSearchFocused && (searchQuery.trim().length > 0 || sortedChords.length > 0) && (
+            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-md shadow-lg max-h-64 overflow-y-auto">
+              {sortedChords.length === 0 ? (
+                <div className="p-4 text-center text-gray-500 dark:text-gray-400">
+                  {searchQuery ? 'No chords found matching your search.' : 'No chords in your library yet.'}
+                </div>
+              ) : (
+                <div className="divide-y divide-gray-200 dark:divide-gray-700">
+                  {sortedChords.map(chord => (
+                    <div
+                      key={chord.id}
+                      className="p-3 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center justify-between cursor-pointer"
+                      onClick={() => {
+                        addChordToWorkspace(chord);
+                        setSearchQuery('');
+                        setIsSearchFocused(false);
+                      }}
+                    >
+                      <div className="flex-1">
+                        <div className="font-medium text-gray-900 dark:text-white">{chord.name}</div>
+                        <div className="text-sm text-gray-500 dark:text-gray-400">
+                          {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${chord.rootNote} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
+                        </div>
+                      </div>
+                      <div className="ml-3 px-2 py-1 bg-teal-600 text-white rounded text-xs">
+                        Add
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Workspace Section */}
+      <div>
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          Your Workspace ({selectedChords.length} chord{selectedChords.length !== 1 ? 's' : ''})
+        </h3>
+        
+        {selectedChords.length === 0 ? (
+          <div className="text-center py-12 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+            <div className="text-4xl mb-2">🎸</div>
+            <p className="text-gray-500 dark:text-gray-400">Add some chords to get started!</p>
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {selectedChords.map((chord, index) => (
+              <div
+                key={chord.id}
+                className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700"
+              >
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <span className="text-sm text-gray-500 dark:text-gray-400">#{index + 1}</span>
+                    <div>
+                      <h4 className="font-medium text-gray-900 dark:text-white">{chord.name}</h4>
+                      <div className="text-xs text-gray-500 dark:text-gray-400">
+                        {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${chord.rootNote} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
+                      </div>
+                    </div>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    {index > 0 && (
+                      <button
+                        onClick={() => moveChordInWorkspace(index, index - 1)}
+                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        title="Move up"
+                      >
+                        ↑
+                      </button>
+                    )}
+                    {index < selectedChords.length - 1 && (
+                      <button
+                        onClick={() => moveChordInWorkspace(index, index + 1)}
+                        className="p-1 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+                        title="Move down"
+                      >
+                        ↓
+                      </button>
+                    )}
+                    <button
+                      onClick={() => removeChordFromWorkspace(chord.id)}
+                      className="p-1 text-red-500 hover:text-red-700"
+                      title="Remove"
+                    >
+                      ✕
+                    </button>
+                  </div>
+                </div>
+                
+                <div>
+                  <Fretboard 
+                    frets={chord.frets}
+                    fingering={chord.fingering}
+                    position={chord.position}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
+      </div>
+
+      {/* Saved Jams Section */}
+      <div className="mt-8">
+        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+          Saved Jams
+        </h3>
+        <SavedJamsList onLoadJam={loadJam} onDeleteJam={deleteJam} />
+      </div>
+
+      {/* Save Jam Modal */}
+      {showSaveModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 max-w-md w-full mx-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+              Save Jam
+            </h3>
+            <div className="mb-4">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Jam Name
+              </label>
+              <input
+                type="text"
+                value={jamName}
+                onChange={(e) => setJamName(e.target.value)}
+                placeholder="Enter a name for your jam..."
+                className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+                onKeyPress={(e) => e.key === 'Enter' && saveJam()}
+              />
+            </div>
+            <div className="flex space-x-3">
+              <button
+                onClick={saveJam}
+                className="flex-1 px-4 py-2 bg-teal-600 text-white rounded-md hover:bg-teal-700 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2"
+              >
+                Save
+              </button>
+              <button
+                onClick={() => {
+                  setShowSaveModal(false);
+                  setJamName('');
+                }}
+                className="px-4 py-2 bg-gray-500 text-white rounded-md hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-gray-500 focus:ring-offset-2"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      <Toast
+        message={toastMessage}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
     </div>
   );
 };
