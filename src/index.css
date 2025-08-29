@@ -32,3 +32,25 @@
 .animate-out {
   animation: slide-out-to-right 0.3s ease-in;
 }
+
+/* Custom fretboard styles */
+.fretboard-grid {
+  display: grid;
+  grid-template-columns: repeat(17, 1fr);
+  gap: 0;
+  width: 100%;
+}
+
+.fretboard-cell {
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-right: 1px solid #d1d5db;
+  border-bottom: 1px solid #d1d5db;
+}
+
+.dark .fretboard-cell {
+  border-right-color: #4b5563;
+  border-bottom-color: #4b5563;
+}

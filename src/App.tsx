@@ -34,7 +34,10 @@ function App() {
     { id: 'add', name: 'Add Chord', icon: Plus },
     { id: 'library', name: 'Chord Library', icon: Library },
     { id: 'keys', name: 'Keys', icon: Music },
-    { id: 'jam', name: 'Jam', icon: Guitar }
+    { id: 'scales', name: 'Scales', icon: RefreshCw },
+    { id: 'theory', name: 'Theory', icon: Music },
+    { id: 'jam', name: 'Jam', icon: Guitar },
+    { id: 'saved', name: 'Saved Jams', icon: Download }
   ];
 
   return (
@@ -105,9 +108,27 @@ function App() {
           </div>
         )}
 
+        {activeTab === 'scales' && (
+          <div>
+            <ScaleBrowser />
+          </div>
+        )}
+
+        {activeTab === 'theory' && (
+          <div>
+            <TheoryTab />
+          </div>
+        )}
+
         {activeTab === 'jam' && (
           <div>
             <JamWorkspace />
+          </div>
+        )}
+
+        {activeTab === 'saved' && (
+          <div>
+            <SavedJamsTab />
           </div>
         )}
       </div>
@@ -801,9 +822,13 @@ const KeySelector: React.FC = () => {
   );
 };
 
-// Saved Jams List Component
-const SavedJamsList: React.FC<{ onLoadJam: (jam: any) => void; onDeleteJam: (jamId: string) => void }> = ({ onLoadJam, onDeleteJam }) => {
+
+
+// Saved Jams Tab Component
+const SavedJamsTab: React.FC = () => {
   const [savedJams, setSavedJams] = useState<any[]>([]);
+  const [toastMessage, setToastMessage] = useState('');
+  const [showToast, setShowToast] = useState(false);
 
   React.useEffect(() => {
     const jams = JSON.parse(localStorage.getItem('savedJams') || '[]');
@@ -821,53 +846,918 @@ const SavedJamsList: React.FC<{ onLoadJam: (jam: any) => void; onDeleteJam: (jam
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  if (savedJams.length === 0) {
-    return (
-      <div className="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
-        <div className="text-3xl mb-2">🎼</div>
-        <p className="text-gray-500 dark:text-gray-400">No saved jams yet</p>
-      </div>
-    );
-  }
+  const loadJam = (jam: any) => {
+    // Load the jam into the jam workspace
+    localStorage.setItem('jamWorkspace', JSON.stringify(jam.chords));
+    setToastMessage(`Loaded jam "${jam.name}" into Jam workspace!`);
+    setShowToast(true);
+  };
+
+  const deleteJam = (jamId: string) => {
+    if (window.confirm('Are you sure you want to delete this jam? This action cannot be undone.')) {
+      const updatedJams = savedJams.filter((jam: any) => jam.id !== jamId);
+      localStorage.setItem('savedJams', JSON.stringify(updatedJams));
+      setSavedJams(updatedJams);
+      setToastMessage('Jam deleted successfully');
+      setShowToast(true);
+    }
+  };
+
+  const exportJams = () => {
+    try {
+      const jams = localStorage.getItem('savedJams') || '[]';
+      const blob = new Blob([jams], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `corduroy-jams-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+      setToastMessage('Jams exported successfully!');
+      setShowToast(true);
+    } catch (error) {
+      console.error('Export failed:', error);
+      setToastMessage('Failed to export jams. Please try again.');
+      setShowToast(true);
+    }
+  };
+
+  const importJams = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      try {
+        const content = e.target?.result as string;
+        const importedJams = JSON.parse(content);
+
+        if (!Array.isArray(importedJams)) {
+          throw new Error('Invalid file format');
+        }
+
+        // Validate jam structure
+        const validJams = importedJams.filter((jam: any) =>
+          jam.id && jam.name && jam.chords && Array.isArray(jam.chords)
+        );
+
+        if (validJams.length === 0) {
+          throw new Error('No valid jams found in file');
+        }
+
+        // Merge with existing jams (avoid duplicates by ID)
+        const existingJams = JSON.parse(localStorage.getItem('savedJams') || '[]');
+        const existingIds = new Set(existingJams.map((j: any) => j.id));
+        const newJams = validJams.filter((jam: any) => !existingIds.has(jam.id));
+
+        const mergedJams = [...existingJams, ...newJams];
+        localStorage.setItem('savedJams', JSON.stringify(mergedJams));
+        setSavedJams(mergedJams);
+
+        setToastMessage(`Successfully imported ${newJams.length} new jams!`);
+        setShowToast(true);
+      } catch (error) {
+        console.error('Import failed:', error);
+        setToastMessage('Failed to import jams. Please check the file format.');
+        setShowToast(true);
+      }
+    };
+    reader.readAsText(file);
+
+    // Reset the input
+    event.target.value = '';
+  };
 
   return (
-    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-      {savedJams.map((jam) => (
-        <div
-          key={jam.id}
-          className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700"
-        >
-          <div className="flex items-center justify-between mb-3">
-            <div>
-              <h4 className="font-medium text-gray-900 dark:text-white">{jam.name}</h4>
-              <div className="text-xs text-gray-500 dark:text-gray-400">
-                {jam.chords.length} chord{jam.chords.length !== 1 ? 's' : ''} • {new Date(jam.createdAt).toLocaleDateString()}
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+            Saved Jams
+          </h2>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Manage your saved chord progressions and jams.
+          </p>
+        </div>
+        <div className="flex space-x-2">
+          <button
+            onClick={exportJams}
+            className="p-2 rounded-lg bg-teal-100 dark:bg-teal-900 text-teal-600 dark:text-teal-400 hover:bg-teal-200 dark:hover:bg-teal-800 transition-colors duration-200"
+            title="Export jams to file"
+          >
+            <Download className="w-5 h-5" />
+          </button>
+          <label className="p-2 rounded-lg bg-blue-100 dark:bg-blue-900 text-blue-600 dark:text-blue-400 hover:bg-blue-200 dark:hover:bg-blue-800 transition-colors duration-200 cursor-pointer">
+            <Upload className="w-5 h-5" />
+            <input
+              type="file"
+              accept=".json"
+              onChange={importJams}
+              className="hidden"
+            />
+          </label>
+        </div>
+      </div>
+
+      {savedJams.length === 0 ? (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🎼</div>
+          <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">No saved jams yet</h4>
+          <p className="text-gray-500 dark:text-gray-400">
+            Create some jams in the Jam tab and save them to see them here!
+          </p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          {savedJams.map((jam) => (
+            <div
+              key={jam.id}
+              className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div>
+                  <h4 className="font-medium text-gray-900 dark:text-white">{jam.name}</h4>
+                  <div className="text-xs text-gray-500 dark:text-gray-400">
+                    {jam.chords.length} chord{jam.chords.length !== 1 ? 's' : ''} • {new Date(jam.createdAt).toLocaleDateString()}
+                  </div>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <button
+                    onClick={() => loadJam(jam)}
+                    className="p-1 text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300"
+                    title="Load jam"
+                  >
+                    ↻
+                  </button>
+                  <button
+                    onClick={() => deleteJam(jam.id)}
+                    className="p-1 text-red-500 hover:text-red-700"
+                    title="Delete jam"
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+              
+              <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
+                {jam.chords.slice(0, 3).map((chord: any) => chord.name).join(' • ')}
+                {jam.chords.length > 3 && ' • ...'}
               </div>
             </div>
-            <div className="flex items-center space-x-2">
-              <button
-                onClick={() => onLoadJam(jam)}
-                className="p-1 text-teal-600 hover:text-teal-800 dark:text-teal-400 dark:hover:text-teal-300"
-                title="Load jam"
-              >
-                ↻
-              </button>
-              <button
-                onClick={() => onDeleteJam(jam.id)}
-                className="p-1 text-red-500 hover:text-red-700"
-                title="Delete jam"
-              >
-                ✕
-              </button>
+          ))}
+        </div>
+      )}
+
+      {/* Toast Notification */}
+      <Toast
+        message={toastMessage}
+        isVisible={showToast}
+        onClose={() => setShowToast(false)}
+      />
+    </div>
+  );
+};
+
+// Scale Browser Component
+const ScaleBrowser: React.FC = () => {
+  const [selectedRoot, setSelectedRoot] = useState('C');
+  const [selectedScale, setSelectedScale] = useState('major');
+  const [selectedPosition, setSelectedPosition] = useState(1);
+  const [showAllPositions, setShowAllPositions] = useState(false);
+
+  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  
+  const SCALES = {
+    major: {
+      name: 'Major',
+      intervals: [0, 2, 4, 5, 7, 9, 11],
+      positions: [
+        { name: 'Position 1 (Open)', startFret: 0, pattern: [0, 2, 4, 5, 7, 9, 11] },
+        { name: 'Position 2', startFret: 2, pattern: [0, 2, 4, 5, 7, 9, 11] },
+        { name: 'Position 3', startFret: 4, pattern: [0, 2, 4, 5, 7, 9, 11] },
+        { name: 'Position 4', startFret: 5, pattern: [0, 2, 4, 5, 7, 9, 11] },
+        { name: 'Position 5', startFret: 7, pattern: [0, 2, 4, 5, 7, 9, 11] }
+      ]
+    },
+    minor: {
+      name: 'Natural Minor',
+      intervals: [0, 2, 3, 5, 7, 8, 10],
+      positions: [
+        { name: 'Position 1 (Open)', startFret: 0, pattern: [0, 2, 3, 5, 7, 8, 10] },
+        { name: 'Position 2', startFret: 2, pattern: [0, 2, 3, 5, 7, 8, 10] },
+        { name: 'Position 3', startFret: 3, pattern: [0, 2, 3, 5, 7, 8, 10] },
+        { name: 'Position 4', startFret: 5, pattern: [0, 2, 3, 5, 7, 8, 10] },
+        { name: 'Position 5', startFret: 7, pattern: [0, 2, 3, 5, 7, 8, 10] }
+      ]
+    },
+    pentatonic: {
+      name: 'Major Pentatonic',
+      intervals: [0, 2, 4, 7, 9],
+      positions: [
+        { name: 'Position 1 (Open)', startFret: 0, pattern: [0, 2, 4, 7, 9] },
+        { name: 'Position 2', startFret: 2, pattern: [0, 2, 4, 7, 9] },
+        { name: 'Position 3', startFret: 4, pattern: [0, 2, 4, 7, 9] },
+        { name: 'Position 4', startFret: 7, pattern: [0, 2, 4, 7, 9] },
+        { name: 'Position 5', startFret: 9, pattern: [0, 2, 4, 7, 9] }
+      ]
+    },
+    pentatonicMinor: {
+      name: 'Minor Pentatonic',
+      intervals: [0, 3, 5, 7, 10],
+      positions: [
+        { name: 'Position 1 (Open)', startFret: 0, pattern: [0, 3, 5, 7, 10] },
+        { name: 'Position 2', startFret: 3, pattern: [0, 3, 5, 7, 10] },
+        { name: 'Position 3', startFret: 5, pattern: [0, 3, 5, 7, 10] },
+        { name: 'Position 4', startFret: 7, pattern: [0, 3, 5, 7, 10] },
+        { name: 'Position 5', startFret: 10, pattern: [0, 3, 5, 7, 10] }
+      ]
+    },
+    dorian: {
+      name: 'Dorian',
+      intervals: [0, 2, 3, 5, 7, 9, 10],
+      positions: [
+        { name: 'Position 1', startFret: 0, pattern: [0, 2, 3, 5, 7, 9, 10] },
+        { name: 'Position 2', startFret: 2, pattern: [0, 2, 3, 5, 7, 9, 10] },
+        { name: 'Position 3', startFret: 3, pattern: [0, 2, 3, 5, 7, 9, 10] },
+        { name: 'Position 4', startFret: 5, pattern: [0, 2, 3, 5, 7, 9, 10] },
+        { name: 'Position 5', startFret: 7, pattern: [0, 2, 3, 5, 7, 9, 10] }
+      ]
+    },
+    mixolydian: {
+      name: 'Mixolydian',
+      intervals: [0, 2, 4, 5, 7, 9, 10],
+      positions: [
+        { name: 'Position 1', startFret: 0, pattern: [0, 2, 4, 5, 7, 9, 10] },
+        { name: 'Position 2', startFret: 2, pattern: [0, 2, 4, 5, 7, 9, 10] },
+        { name: 'Position 3', startFret: 4, pattern: [0, 2, 4, 5, 7, 9, 10] },
+        { name: 'Position 4', startFret: 5, pattern: [0, 2, 4, 5, 7, 9, 10] },
+        { name: 'Position 5', startFret: 7, pattern: [0, 2, 4, 5, 7, 9, 10] }
+      ]
+    }
+  };
+
+  const getNoteIndex = (note: string) => {
+    return NOTES.indexOf(note);
+  };
+
+  const getScaleNotes = (root: string, scaleType: string) => {
+    const rootIndex = getNoteIndex(root);
+    const scale = SCALES[scaleType as keyof typeof SCALES];
+    if (!scale) return [];
+    
+    return scale.intervals.map(interval => {
+      const noteIndex = (rootIndex + interval) % 12;
+      return NOTES[noteIndex];
+    });
+  };
+
+  const getFretboardNotes = (root: string, scaleType: string, position: number) => {
+    const scale = SCALES[scaleType as keyof typeof SCALES];
+    if (!scale) return [];
+    
+    const positionData = scale.positions[position - 1];
+    if (!positionData) return [];
+    
+    const rootIndex = getNoteIndex(root);
+    const scaleNotes = getScaleNotes(root, scaleType);
+    
+    // Define string tunings (E, A, D, G, B, E)
+    const stringTunings = ['E', 'A', 'D', 'G', 'B', 'E'];
+    
+    const fretboard = stringTunings.map((stringNote, stringIndex) => {
+      const stringNoteIndex = getNoteIndex(stringNote);
+      const frets = [];
+      
+      // Check each fret from 0 to 15
+      for (let fret = 0; fret <= 15; fret++) {
+        const noteIndex = (stringNoteIndex + fret) % 12;
+        const note = NOTES[noteIndex];
+        
+        if (scaleNotes.includes(note)) {
+          // Check if this note is in the current position
+          const relativeToRoot = (noteIndex - rootIndex + 12) % 12;
+          if (positionData.pattern.includes(relativeToRoot)) {
+            frets.push({
+              fret,
+              note,
+              isRoot: note === root,
+              isInPosition: true
+            });
+          }
+        }
+      }
+      
+      return { string: stringIndex, frets };
+    });
+    
+    return fretboard;
+  };
+
+  const renderFretboard = (root: string, scaleType: string, position: number) => {
+    const fretboard = getFretboardNotes(root, scaleType, position);
+    const scaleNotes = getScaleNotes(root, scaleType);
+    
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div className="text-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {root} {SCALES[scaleType as keyof typeof SCALES]?.name}
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Notes: {scaleNotes.join(' - ')} • Frets 0-15
+          </p>
+        </div>
+        
+        <div className="relative overflow-x-auto">
+          {/* Fretboard */}
+          <div className="fretboard-grid border-2 border-gray-800 dark:border-gray-200 rounded-lg">
+            {/* String labels */}
+            <div className="flex flex-col">
+              <div className="fretboard-cell text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700">
+                String
+              </div>
+              {['E', 'A', 'D', 'G', 'B', 'E'].map((note, i) => (
+                <div key={i} className="fretboard-cell text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700">
+                  {note}
+                </div>
+              ))}
             </div>
-          </div>
-          
-          <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-            {jam.chords.slice(0, 3).map((chord: any) => chord.name).join(' • ')}
-            {jam.chords.length > 3 && ' • ...'}
+            
+            {/* Fret numbers and notes */}
+            {Array.from({ length: 16 }, (_, fret) => (
+              <div key={fret} className="flex flex-col">
+                <div className="fretboard-cell text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700">
+                  {fret}
+                </div>
+                {fretboard.map((string, stringIndex) => {
+                  const fretData = string.frets.find(f => f.fret === fret);
+                  return (
+                    <div
+                      key={stringIndex}
+                      className={`fretboard-cell text-xs relative ${
+                        fretData ? 'bg-teal-100 dark:bg-teal-900' : 'bg-white dark:bg-gray-800'
+                      }`}
+                    >
+                      {fretData && (
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
+                          fretData.isRoot 
+                            ? 'bg-teal-600 text-white' 
+                            : 'bg-teal-200 dark:bg-teal-800 text-teal-800 dark:text-teal-200'
+                        }`}>
+                          {fretData.note}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
           </div>
         </div>
-      ))}
+      </div>
+    );
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          Scale Browser
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Explore different scales and their positions on the guitar fretboard.
+        </p>
+      </div>
+
+      {/* Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Root Note
+          </label>
+          <select
+            value={selectedRoot}
+            onChange={(e) => setSelectedRoot(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          >
+            {NOTES.map(note => (
+              <option key={note} value={note}>{note}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Scale Type
+          </label>
+          <select
+            value={selectedScale}
+            onChange={(e) => setSelectedScale(e.target.value)}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          >
+            {Object.entries(SCALES).map(([key, scale]) => (
+              <option key={key} value={key}>{scale.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Position
+          </label>
+          <select
+            value={selectedPosition}
+            onChange={(e) => setSelectedPosition(Number(e.target.value))}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          >
+            {SCALES[selectedScale as keyof typeof SCALES]?.positions.map((_, index) => (
+              <option key={index + 1} value={index + 1}>
+                Position {index + 1}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-end">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={showAllPositions}
+              onChange={(e) => setShowAllPositions(e.target.checked)}
+              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500"
+            />
+            <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+              Show all positions
+            </span>
+          </label>
+        </div>
+      </div>
+
+      {/* Scale Display */}
+      {showAllPositions ? (
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+          {SCALES[selectedScale as keyof typeof SCALES]?.positions.map((_, index) => (
+            <div key={index + 1}>
+              {renderFretboard(selectedRoot, selectedScale, index + 1)}
+            </div>
+          ))}
+        </div>
+      ) : (
+        <div>
+          {renderFretboard(selectedRoot, selectedScale, selectedPosition)}
+        </div>
+      )}
+    </div>
+  );
+};
+
+// Theory Tab Component
+const TheoryTab: React.FC = () => {
+  const [selectedKey, setSelectedKey] = useState('');
+  const [selectedScale, setSelectedScale] = useState('major');
+  const [selectedPosition, setSelectedPosition] = useState(1);
+  const [showAllPositions, setShowAllPositions] = useState(false);
+  const [customChords, setCustomChords] = useState<any[]>([]);
+
+  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  
+  const SCALES = {
+    major: {
+      name: 'Major',
+      intervals: [0, 2, 4, 5, 7, 9, 11],
+      positions: [
+        { name: 'Position 1 (Open)', startFret: 0, pattern: [0, 2, 4, 5, 7, 9, 11] },
+        { name: 'Position 2', startFret: 2, pattern: [0, 2, 4, 5, 7, 9, 11] },
+        { name: 'Position 3', startFret: 4, pattern: [0, 2, 4, 5, 7, 9, 11] },
+        { name: 'Position 4', startFret: 5, pattern: [0, 2, 4, 5, 7, 9, 11] },
+        { name: 'Position 5', startFret: 7, pattern: [0, 2, 4, 5, 7, 9, 11] }
+      ]
+    },
+    minor: {
+      name: 'Natural Minor',
+      intervals: [0, 2, 3, 5, 7, 8, 10],
+      positions: [
+        { name: 'Position 1 (Open)', startFret: 0, pattern: [0, 2, 3, 5, 7, 8, 10] },
+        { name: 'Position 2', startFret: 2, pattern: [0, 2, 3, 5, 7, 8, 10] },
+        { name: 'Position 3', startFret: 3, pattern: [0, 2, 3, 5, 7, 8, 10] },
+        { name: 'Position 4', startFret: 5, pattern: [0, 2, 3, 5, 7, 8, 10] },
+        { name: 'Position 5', startFret: 7, pattern: [0, 2, 3, 5, 7, 8, 10] }
+      ]
+    },
+    pentatonic: {
+      name: 'Major Pentatonic',
+      intervals: [0, 2, 4, 7, 9],
+      positions: [
+        { name: 'Position 1 (Open)', startFret: 0, pattern: [0, 2, 4, 7, 9] },
+        { name: 'Position 2', startFret: 2, pattern: [0, 2, 4, 7, 9] },
+        { name: 'Position 3', startFret: 4, pattern: [0, 2, 4, 7, 9] },
+        { name: 'Position 4', startFret: 7, pattern: [0, 2, 4, 7, 9] },
+        { name: 'Position 5', startFret: 9, pattern: [0, 2, 4, 7, 9] }
+      ]
+    },
+    pentatonicMinor: {
+      name: 'Minor Pentatonic',
+      intervals: [0, 3, 5, 7, 10],
+      positions: [
+        { name: 'Position 1 (Open)', startFret: 0, pattern: [0, 3, 5, 7, 10] },
+        { name: 'Position 2', startFret: 3, pattern: [0, 3, 5, 7, 10] },
+        { name: 'Position 3', startFret: 5, pattern: [0, 3, 5, 7, 10] },
+        { name: 'Position 4', startFret: 7, pattern: [0, 3, 5, 7, 10] },
+        { name: 'Position 5', startFret: 10, pattern: [0, 3, 5, 7, 10] }
+      ]
+    }
+  };
+
+  const musicalKeys = {
+    'C Major': ['C', 'Dm', 'Em', 'F', 'G', 'Am', 'Bdim'],
+    'G Major': ['G', 'Am', 'Bm', 'C', 'D', 'Em', 'F#dim'],
+    'D Major': ['D', 'Em', 'F#m', 'G', 'A', 'Bm', 'C#dim'],
+    'A Major': ['A', 'Bm', 'C#m', 'D', 'E', 'F#m', 'G#dim'],
+    'E Major': ['E', 'F#m', 'G#m', 'A', 'B', 'C#m', 'D#dim'],
+    'B Major': ['B', 'C#m', 'D#m', 'E', 'F#', 'G#m', 'A#dim'],
+    'F# Major': ['F#', 'G#m', 'A#m', 'B', 'C#', 'D#m', 'E#dim'],
+    'C# Major': ['C#', 'D#m', 'E#m', 'F#', 'G#', 'A#m', 'B#dim'],
+    'F Major': ['F', 'Gm', 'Am', 'Bb', 'C', 'Dm', 'Edim'],
+    'Bb Major': ['Bb', 'Cm', 'Dm', 'Eb', 'F', 'Gm', 'Adim'],
+    'Eb Major': ['Eb', 'Fm', 'Gm', 'Ab', 'Bb', 'Cm', 'Ddim'],
+    'Ab Major': ['Ab', 'Bbm', 'Cm', 'Db', 'Eb', 'Fm', 'Gdim'],
+    'Db Major': ['Db', 'Ebm', 'Fm', 'Gb', 'Ab', 'Bbm', 'Cdim'],
+    'Gb Major': ['Gb', 'Abm', 'Bbm', 'Cb', 'Db', 'Ebm', 'Fdim'],
+    'Cb Major': ['Cb', 'Dbm', 'Ebm', 'Fb', 'Gb', 'Abm', 'Bbdim'],
+    'A Minor': ['Am', 'Bdim', 'C', 'Dm', 'Em', 'F', 'G'],
+    'E Minor': ['Em', 'F#dim', 'G', 'Am', 'Bm', 'C', 'D'],
+    'B Minor': ['Bm', 'C#dim', 'D', 'Em', 'F#m', 'G', 'A'],
+    'F# Minor': ['F#m', 'G#dim', 'A', 'Bm', 'C#m', 'D', 'E'],
+    'C# Minor': ['C#m', 'D#dim', 'E', 'F#m', 'G#m', 'A', 'B'],
+    'G# Minor': ['G#m', 'A#dim', 'B', 'C#m', 'D#m', 'E', 'F#'],
+    'D# Minor': ['D#m', 'E#dim', 'F#', 'G#m', 'A#m', 'B', 'C#'],
+    'A# Minor': ['A#m', 'B#dim', 'C#', 'D#m', 'E#m', 'F#', 'G#'],
+    'D Minor': ['Dm', 'Edim', 'F', 'Gm', 'Am', 'Bb', 'C'],
+    'G Minor': ['Gm', 'Adim', 'Bb', 'Cm', 'Dm', 'Eb', 'F'],
+    'C Minor': ['Cm', 'Ddim', 'Eb', 'Fm', 'Gm', 'Ab', 'Bb'],
+    'F Minor': ['Fm', 'Gdim', 'Ab', 'Bbm', 'Cm', 'Db', 'Eb'],
+    'Bb Minor': ['Bbm', 'Cdim', 'Db', 'Ebm', 'Fm', 'Gb', 'Ab'],
+    'Eb Minor': ['Ebm', 'Fdim', 'Gb', 'Abm', 'Bbm', 'Cb', 'Db'],
+    'Ab Minor': ['Abm', 'Bbdim', 'Cb', 'Dbm', 'Ebm', 'Fb', 'Gb']
+  };
+
+  React.useEffect(() => {
+    const chords = JSON.parse(localStorage.getItem('customChords') || '[]');
+    setCustomChords(chords);
+  }, []);
+
+  const getNoteIndex = (note: string) => {
+    return NOTES.indexOf(note);
+  };
+
+  const getScaleNotes = (root: string, scaleType: string) => {
+    const rootIndex = getNoteIndex(root);
+    const scale = SCALES[scaleType as keyof typeof SCALES];
+    if (!scale) return [];
+    
+    return scale.intervals.map(interval => {
+      const noteIndex = (rootIndex + interval) % 12;
+      return NOTES[noteIndex];
+    });
+  };
+
+  const getFretboardNotes = (root: string, scaleType: string, position: number) => {
+    const scale = SCALES[scaleType as keyof typeof SCALES];
+    if (!scale) return [];
+    
+    const positionData = scale.positions[position - 1];
+    if (!positionData) return [];
+    
+    const rootIndex = getNoteIndex(root);
+    const scaleNotes = getScaleNotes(root, scaleType);
+    
+    // Define string tunings (E, A, D, G, B, E)
+    const stringTunings = ['E', 'A', 'D', 'G', 'B', 'E'];
+    
+    const fretboard = stringTunings.map((stringNote, stringIndex) => {
+      const stringNoteIndex = getNoteIndex(stringNote);
+      const frets = [];
+      
+      // Check each fret from 0 to 15
+      for (let fret = 0; fret <= 15; fret++) {
+        const noteIndex = (stringNoteIndex + fret) % 12;
+        const note = NOTES[noteIndex];
+        
+        if (scaleNotes.includes(note)) {
+          // Check if this note is in the current position
+          const relativeToRoot = (noteIndex - rootIndex + 12) % 12;
+          if (positionData.pattern.includes(relativeToRoot)) {
+            frets.push({
+              fret,
+              note,
+              isRoot: note === root,
+              isInPosition: true
+            });
+          }
+        }
+      }
+      
+      return { string: stringIndex, frets };
+    });
+    
+    return fretboard;
+  };
+
+  const getChordsInKey = (key: string) => {
+    if (!key || !musicalKeys[key as keyof typeof musicalKeys]) return [];
+    
+    const keyChords = musicalKeys[key as keyof typeof musicalKeys];
+    
+    return customChords.filter(chord => {
+      // Normalize chord names for comparison
+      const chordName = chord.name || '';
+      const normalizedChordName = chordName.replace(/[#♯]/g, '#').replace(/[b♭]/g, 'b');
+      
+      return keyChords.some(keyChord => {
+        const normalizedKeyChord = keyChord.replace(/[#♯]/g, '#').replace(/[b♭]/g, 'b');
+        return normalizedChordName.includes(normalizedKeyChord) || 
+               normalizedKeyChord.includes(normalizedChordName);
+      });
+    });
+  };
+
+  const renderFretboard = (root: string, scaleType: string, position: number) => {
+    const fretboard = getFretboardNotes(root, scaleType, position);
+    const scaleNotes = getScaleNotes(root, scaleType);
+    
+    return (
+      <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+        <div className="text-center mb-4">
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+            {root} {SCALES[scaleType as keyof typeof SCALES]?.name}
+          </h3>
+          <p className="text-sm text-gray-600 dark:text-gray-400">
+            Notes: {scaleNotes.join(' - ')} • Frets 0-15
+          </p>
+        </div>
+        
+        <div className="relative overflow-x-auto">
+          {/* Fretboard */}
+          <div className="fretboard-grid border-2 border-gray-800 dark:border-gray-200 rounded-lg">
+            {/* String labels */}
+            <div className="flex flex-col">
+              <div className="fretboard-cell text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700">
+                String
+              </div>
+              {['E', 'A', 'D', 'G', 'B', 'E'].map((note, i) => (
+                <div key={i} className="fretboard-cell text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700">
+                  {note}
+                </div>
+              ))}
+            </div>
+            
+            {/* Fret numbers and notes */}
+            {Array.from({ length: 16 }, (_, fret) => (
+              <div key={fret} className="flex flex-col">
+                <div className="fretboard-cell text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700">
+                  {fret}
+                </div>
+                {fretboard.map((string, stringIndex) => {
+                  const fretData = string.frets.find(f => f.fret === fret);
+                  return (
+                    <div
+                      key={stringIndex}
+                      className={`fretboard-cell text-xs relative ${
+                        fretData ? 'bg-teal-100 dark:bg-teal-900' : 'bg-white dark:bg-gray-800'
+                      }`}
+                    >
+                      {fretData && (
+                        <div className={`w-5 h-5 rounded-full flex items-center justify-center text-xs font-medium ${
+                          fretData.isRoot 
+                            ? 'bg-teal-600 text-white' 
+                            : 'bg-teal-200 dark:bg-teal-800 text-teal-800 dark:text-teal-200'
+                        }`}>
+                          {fretData.note}
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+    );
+  };
+
+  const getKeyRoot = (keyName: string) => {
+    return keyName.split(' ')[0];
+  };
+
+  const getKeyType = (keyName: string) => {
+    return keyName.includes('Minor') ? 'minor' : 'major';
+  };
+
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+      <div className="mb-6">
+        <h2 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
+          Music Theory
+        </h2>
+        <p className="text-sm text-gray-600 dark:text-gray-400">
+          Explore keys, scales, and chords together. Choose a key to see its scale and available chords.
+        </p>
+      </div>
+
+      {/* Controls */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Musical Key
+          </label>
+          <select
+            value={selectedKey}
+            onChange={(e) => {
+              setSelectedKey(e.target.value);
+              if (e.target.value) {
+                const keyRoot = getKeyRoot(e.target.value);
+                const keyType = getKeyType(e.target.value);
+                setSelectedScale(keyType);
+              }
+            }}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
+          >
+            <option value="">Select a key...</option>
+            {Object.keys(musicalKeys).map(key => (
+              <option key={key} value={key}>{key}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Scale Type
+          </label>
+          <select
+            value={selectedScale}
+            onChange={(e) => setSelectedScale(e.target.value)}
+            disabled={!selectedKey}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-600"
+          >
+            {Object.entries(SCALES).map(([key, scale]) => (
+              <option key={key} value={key}>{scale.name}</option>
+            ))}
+          </select>
+        </div>
+
+        <div>
+          <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+            Position
+          </label>
+          <select
+            value={selectedPosition}
+            onChange={(e) => setSelectedPosition(Number(e.target.value))}
+            disabled={!selectedKey}
+            className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white disabled:bg-gray-100 dark:disabled:bg-gray-600"
+          >
+            {SCALES[selectedScale as keyof typeof SCALES]?.positions.map((_, index) => (
+              <option key={index + 1} value={index + 1}>
+                Position {index + 1}
+              </option>
+            ))}
+          </select>
+        </div>
+
+        <div className="flex items-end">
+          <label className="flex items-center">
+            <input
+              type="checkbox"
+              checked={showAllPositions}
+              onChange={(e) => setShowAllPositions(e.target.checked)}
+              disabled={!selectedKey}
+              className="rounded border-gray-300 text-teal-600 focus:ring-teal-500 disabled:opacity-50"
+            />
+            <span className="ml-2 text-sm text-gray-700 dark:text-gray-300">
+              Show all positions
+            </span>
+          </label>
+        </div>
+      </div>
+
+             {/* Scale Display */}
+       {selectedKey && (
+         <div className="mb-8">
+           <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+             Scale: {getKeyRoot(selectedKey)} {SCALES[selectedScale as keyof typeof SCALES]?.name}
+           </h3>
+           
+           {/* Chord Progression */}
+           <div className="mb-4 p-3 bg-gray-50 dark:bg-gray-700 rounded-lg">
+             <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Chord Progression:</h4>
+             <div className="flex flex-wrap gap-2">
+               {musicalKeys[selectedKey as keyof typeof musicalKeys]?.map((chord, index) => {
+                 const isMajor = selectedKey.includes('Major');
+                 const romanNumerals = isMajor 
+                   ? ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°']
+                   : ['i', 'ii°', 'III', 'iv', 'v', 'VI', 'VII'];
+                 
+                 const hasChords = customChords.some(c => {
+                   const chordDisplayName = c.name.toLowerCase();
+                   const targetChordName = chord.toLowerCase();
+                   return chordDisplayName === targetChordName || 
+                          chordDisplayName.replace('c#', 'db').replace('d#', 'eb').replace('f#', 'gb').replace('g#', 'ab').replace('a#', 'bb') === 
+                          targetChordName.replace('c#', 'db').replace('d#', 'eb').replace('f#', 'gb').replace('g#', 'ab').replace('a#', 'bb');
+                 });
+                 
+                 return (
+                   <div
+                     key={chord}
+                     className={`px-3 py-1 rounded text-sm font-medium ${
+                       hasChords 
+                         ? 'bg-teal-100 dark:bg-teal-900 text-teal-800 dark:text-teal-200' 
+                         : 'bg-gray-100 dark:bg-gray-600 text-gray-500 dark:text-gray-400'
+                     }`}
+                   >
+                     <div className="text-xs text-gray-500 dark:text-gray-400">{romanNumerals[index]}</div>
+                     <div>{chord}</div>
+                   </div>
+                 );
+               })}
+             </div>
+           </div>
+          
+          {showAllPositions ? (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {SCALES[selectedScale as keyof typeof SCALES]?.positions.map((_, index) => (
+                <div key={index + 1}>
+                  {renderFretboard(getKeyRoot(selectedKey), selectedScale, index + 1)}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div>
+              {renderFretboard(getKeyRoot(selectedKey), selectedScale, selectedPosition)}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Chords in Key */}
+      {selectedKey && (
+        <div>
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
+            Chords in {selectedKey}
+          </h3>
+          
+          {(() => {
+            const chordsInKey = getChordsInKey(selectedKey);
+            return chordsInKey.length === 0 ? (
+              <div className="text-center py-8 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-lg">
+                <div className="text-3xl mb-2">🎵</div>
+                <p className="text-gray-500 dark:text-gray-400">
+                  No chords found for {selectedKey}. Add some chords to your library!
+                </p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                {chordsInKey.map(chord => (
+                  <div
+                    key={chord.id}
+                    className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700"
+                  >
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <h4 className="font-medium text-gray-900 dark:text-white">{chord.name}</h4>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                          {chord.rootNote} {chord.chordQuality} • {chord.chordVoicing}
+                        </div>
+                      </div>
+                    </div>
+                    
+                    <div className="mb-3">
+                      <Fretboard
+                        frets={chord.frets}
+                        fingering={chord.fingering}
+                        position={chord.position}
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            );
+          })()}
+        </div>
+      )}
+
+      {!selectedKey && (
+        <div className="text-center py-12">
+          <div className="text-6xl mb-4">🎼</div>
+          <h4 className="text-lg font-medium text-gray-900 dark:text-gray-100 mb-2">
+            Choose a musical key to get started
+          </h4>
+          <p className="text-gray-500 dark:text-gray-400">
+            Select a key from the dropdown above to explore its scale and available chords.
+          </p>
+        </div>
+      )}
     </div>
   );
 };
@@ -1185,13 +2075,7 @@ const JamWorkspace: React.FC = () => {
         )}
       </div>
 
-      {/* Saved Jams Section */}
-      <div className="mt-8">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4">
-          Saved Jams
-        </h3>
-        <SavedJamsList onLoadJam={loadJam} onDeleteJam={deleteJam} />
-      </div>
+
 
       {/* Save Jam Modal */}
       {showSaveModal && (

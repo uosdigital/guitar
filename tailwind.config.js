@@ -4,6 +4,10 @@ export default {
   darkMode: 'class',
   theme: {
     extend: {
+      gridTemplateColumns: {
+        '16': 'repeat(16, minmax(0, 1.5rem))',
+        '16-narrow': 'repeat(16, minmax(0, 1.5rem))',
+      },
       colors: {
         dark: {
           50: '#f8fafc',
