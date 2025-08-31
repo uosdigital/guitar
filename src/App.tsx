@@ -212,7 +212,7 @@ function App() {
 
         {activeTab === 'saved' && (
           <div>
-            <SavedJamsTab />
+            <SavedJamsTab convertNote={convertNote} />
           </div>
         )}
       </div>
@@ -975,9 +975,9 @@ const KeySelector: React.FC<{ useSharps: boolean; convertNote: (note: string) =>
                   className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-700"
                 >
                   <div className="mb-3">
-                    <h4 className="font-medium text-gray-900 dark:text-white">{chord.name}</h4>
+                    <h4 className="font-medium text-gray-900 dark:text-white">{convertNote(chord.name)}</h4>
                     <div className="text-xs text-gray-500 dark:text-gray-400">
-                      {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${chord.rootNote} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
+                      {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${convertNote(chord.rootNote)} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
                     </div>
                   </div>
                   
@@ -1011,7 +1011,7 @@ const KeySelector: React.FC<{ useSharps: boolean; convertNote: (note: string) =>
 
 
 // Saved Jams Tab Component
-const SavedJamsTab: React.FC = () => {
+const SavedJamsTab: React.FC<{ convertNote: (note: string) => string }> = ({ convertNote }) => {
   const [savedJams, setSavedJams] = useState<SavedJam[]>([]);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
@@ -1196,7 +1196,7 @@ const SavedJamsTab: React.FC = () => {
               </div>
               
               <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                {jam.chords.slice(0, 3).map((chord: JamChord) => chord.name).join(' • ')}
+                {jam.chords.slice(0, 3).map((chord: JamChord) => convertNote(chord.name)).join(' • ')}
                 {jam.chords.length > 3 && ' • ...'}
               </div>
             </div>
@@ -1965,9 +1965,9 @@ const TheoryTab: React.FC<{ useSharps: boolean; convertNote: (note: string) => s
                   >
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <h4 className="font-medium text-gray-900 dark:text-white">{chord.name}</h4>
+                        <h4 className="font-medium text-gray-900 dark:text-white">{convertNote(chord.name)}</h4>
                         <div className="text-xs text-gray-500 dark:text-gray-400">
-                          {chord.rootNote} {chord.chordQuality} • {chord.chordVoicing}
+                          {convertNote(chord.rootNote)} {chord.chordQuality} • {chord.chordVoicing}
                         </div>
                       </div>
                     </div>
@@ -2052,6 +2052,14 @@ const JamWorkspace: React.FC<{ capoFret: number; setCapoFret: (fret: number) => 
     window.addEventListener('storage', handleJamWorkspaceChange);
     return () => window.removeEventListener('storage', handleJamWorkspaceChange);
   }, [setCapoFret]);
+
+  // Refresh selected chords when sharp/flat preference changes
+  React.useEffect(() => {
+    const saved = localStorage.getItem('jamWorkspace');
+    if (saved) {
+      setSelectedChords(JSON.parse(saved));
+    }
+  }, [useSharps]);
 
 
 
@@ -2342,7 +2350,7 @@ const JamWorkspace: React.FC<{ capoFret: number; setCapoFret: (fret: number) => 
                     <span className="text-sm text-gray-500 dark:text-gray-400">#{index + 1}</span>
                     <div>
                       <h4 className="font-medium text-gray-900 dark:text-white">
-                        {capoFret > 0 ? getCapoChord(chord.name, capoFret) : chord.name}
+                        {capoFret > 0 ? getCapoChord(convertNote(chord.name), capoFret) : convertNote(chord.name)}
                         {capoFret > 0 && (
                           <span className="text-xs text-gray-500 dark:text-gray-400 ml-2">
                             (capo {capoFret})
@@ -2350,10 +2358,10 @@ const JamWorkspace: React.FC<{ capoFret: number; setCapoFret: (fret: number) => 
                         )}
                       </h4>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${chord.rootNote} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
+                        {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${convertNote(chord.rootNote)} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
                         {capoFret > 0 && (
                           <span className="ml-2 text-teal-600 dark:text-teal-400">
-                            → {getCapoChord(chord.rootNote + ' ' + chord.chordQuality, capoFret)}
+                            → {getCapoChord(convertNote(chord.rootNote) + ' ' + chord.chordQuality, capoFret)}
                           </span>
                         )}
                       </div>
