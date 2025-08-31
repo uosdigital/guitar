@@ -4,15 +4,46 @@ import { CustomChordBuilder } from './components/CustomChordBuilder';
 import Fretboard from './components/Fretboard';
 import guitarIcon from './guitar.jpg';
 
+// TypeScript interfaces for better type safety
+interface Chord {
+  id: string;
+  name: string;
+  rootNote: string;
+  chordQuality: string;
+  chordVoicing: string;
+  frets: string[];
+  position: number;
+  capoFret?: number;
+  fingering?: string[];
+}
+
+interface JamChord extends Chord {
+  id: string;
+}
+
+interface SavedJam {
+  id: string;
+  name: string;
+  chords: JamChord[];
+  capoFret: number;
+  timestamp: number;
+  createdAt?: string;
+}
+
+
+
 function App() {
   const [darkMode, setDarkMode] = useState(false);
   const [activeTab, setActiveTab] = useState('add');
   const [capoFret, setCapoFret] = useState(0);
+  const [useSharps, setUseSharps] = useState(true);
 
-  // Initialize dark mode from localStorage
+  // Initialize dark mode and sharp/flat preference from localStorage
   useEffect(() => {
     const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+    const savedUseSharps = localStorage.getItem('useSharps') !== 'false'; // Default to sharps
     setDarkMode(savedDarkMode);
+    setUseSharps(savedUseSharps);
   }, []);
 
   // Toggle dark mode and save to localStorage
@@ -30,6 +61,34 @@ function App() {
       document.documentElement.classList.remove('dark');
     }
   }, [darkMode]);
+
+  // Toggle between sharps and flats
+  const toggleSharpFlat = () => {
+    const newUseSharps = !useSharps;
+    setUseSharps(newUseSharps);
+    localStorage.setItem('useSharps', newUseSharps.toString());
+  };
+
+  // Utility function to convert between sharps and flats
+  const convertNote = (note: string) => {
+    if (!note) return note;
+    
+    const sharpToFlat: { [key: string]: string } = {
+      'C#': 'D♭', 'D#': 'E♭', 'F#': 'G♭', 'G#': 'A♭', 'A#': 'B♭'
+    };
+    
+    const flatToSharp: { [key: string]: string } = {
+      'D♭': 'C#', 'E♭': 'D#', 'G♭': 'F#', 'A♭': 'G#', 'B♭': 'A#'
+    };
+    
+    if (useSharps) {
+      // Convert flats to sharps
+      return flatToSharp[note] || note;
+    } else {
+      // Convert sharps to flats
+      return sharpToFlat[note] || note;
+    }
+  };
 
   const tabs = [
     { id: 'add', name: 'Add Chord', icon: Plus },
@@ -52,14 +111,38 @@ function App() {
               <h1 className="text-xl font-bold text-teal-900 dark:text-teal-100">Corduroy</h1>
             </div>
             
-            {/* Dark Mode Toggle */}
-            <button
-              onClick={toggleDarkMode}
-              className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
-              aria-label="Toggle dark mode"
-            >
-              {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
-            </button>
+            {/* Toggle Controls Grouped Together */}
+            <div className="flex items-center space-x-3">
+              {/* Sharp/Flat Toggle */}
+              <div className="flex items-center space-x-3">
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Flats</span>
+                <button
+                  onClick={toggleSharpFlat}
+                  className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-teal-500 focus:ring-offset-2 ${
+                    useSharps 
+                      ? 'bg-teal-600 dark:bg-teal-500' 
+                      : 'bg-gray-200 dark:bg-gray-600'
+                  }`}
+                  aria-label="Toggle between sharps and flats"
+                >
+                  <span
+                    className={`inline-block h-4 w-4 transform rounded-full bg-white transition-transform duration-200 ${
+                      useSharps ? 'translate-x-6' : 'translate-x-1'
+                    }`}
+                  />
+                </button>
+                <span className="text-xs font-medium text-gray-600 dark:text-gray-400">Sharps</span>
+              </div>
+              
+              {/* Dark Mode Toggle */}
+              <button
+                onClick={toggleDarkMode}
+                className="p-2 rounded-lg bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+                aria-label="Toggle dark mode"
+              >
+                {darkMode ? <Sun className="w-5 h-5" /> : <Moon className="w-5 h-5" />}
+              </button>
+            </div>
           </div>
         </div>
       </div>
@@ -93,37 +176,37 @@ function App() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {activeTab === 'add' && (
           <div>
-            <CustomChordBuilder />
+            <CustomChordBuilder useSharps={useSharps} convertNote={convertNote} />
           </div>
         )}
         
         {activeTab === 'library' && (
           <div>
-            <ChordLibrary />
+            <ChordLibrary useSharps={useSharps} convertNote={convertNote} />
           </div>
         )}
 
         {activeTab === 'keys' && (
           <div>
-            <KeySelector />
+            <KeySelector useSharps={useSharps} convertNote={convertNote} />
           </div>
         )}
 
         {activeTab === 'scales' && (
           <div>
-            <ScaleBrowser />
+            <ScaleBrowser useSharps={useSharps} convertNote={convertNote} />
           </div>
         )}
 
         {activeTab === 'theory' && (
           <div>
-            <TheoryTab />
+            <TheoryTab useSharps={useSharps} convertNote={convertNote} />
           </div>
         )}
 
         {activeTab === 'jam' && (
           <div>
-            <JamWorkspace capoFret={capoFret} setCapoFret={setCapoFret} />
+            <JamWorkspace capoFret={capoFret} setCapoFret={setCapoFret} useSharps={useSharps} convertNote={convertNote} />
           </div>
         )}
 
@@ -167,12 +250,66 @@ const Toast: React.FC<{ message: string; isVisible: boolean; onClose: () => void
 };
 
 // Chord Library Component
-const ChordLibrary: React.FC = () => {
-  const [customChords, setCustomChords] = useState<any[]>(() => {
+const ChordLibrary: React.FC<{ useSharps: boolean; convertNote: (note: string) => string }> = ({ useSharps, convertNote }) => {
+  // Convert chord data to match current sharp/flat preference
+  const convertChordData = React.useCallback((chord: Chord) => {
+    // Extract the root note from the chord name
+    let rootNote = '';
+    let chordQuality = '';
+    
+    // Handle different chord naming patterns
+    if (chord.name.includes('maj') || chord.name.includes('Maj')) {
+      rootNote = chord.name.replace('maj', '').replace('Maj', '');
+      chordQuality = 'Major';
+    } else if (chord.name.includes('m') || chord.name.includes('min')) {
+      rootNote = chord.name.replace('m', '').replace('min', '');
+      chordQuality = 'Minor';
+    } else if (chord.name.includes('dim')) {
+      rootNote = chord.name.replace('dim', '');
+      chordQuality = 'Diminished';
+    } else if (chord.name.includes('aug')) {
+      rootNote = chord.name.replace('aug', '');
+      chordQuality = 'Augmented';
+    } else if (chord.name.includes('7')) {
+      rootNote = chord.name.replace('7', '');
+      chordQuality = '7';
+    } else {
+      // Assume major chord if no quality specified
+      rootNote = chord.name;
+      chordQuality = 'Major';
+    }
+    
+    // Convert the root note
+    const convertedRootNote = convertNote(rootNote);
+    
+    // Reconstruct the chord name with converted root
+    let convertedName = '';
+    if (chordQuality === 'Major') {
+      convertedName = convertedRootNote;
+    } else if (chordQuality === 'Minor') {
+      convertedName = convertedRootNote + 'm';
+    } else if (chordQuality === 'Diminished') {
+      convertedName = convertedRootNote + 'dim';
+    } else if (chordQuality === 'Augmented') {
+      convertedName = convertedRootNote + 'aug';
+    } else {
+      convertedName = convertedRootNote + chordQuality;
+    }
+    
+    return {
+      ...chord,
+      name: convertedName,
+      rootNote: convertedRootNote
+    };
+  }, [convertNote]);
+
+  const [customChords, setCustomChords] = useState<Chord[]>(() => {
     const saved = localStorage.getItem('customChords');
-    return saved ? JSON.parse(saved) : [];
+    const chords = saved ? JSON.parse(saved) : [];
+    // Convert chord data to match current sharp/flat preference
+    return chords.map(convertChordData);
   });
-  const [editingChord, setEditingChord] = useState<any>(null);
+  const [editingChord, setEditingChord] = useState<Chord | null>(null);
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterRoot, setFilterRoot] = useState('');
@@ -182,10 +319,19 @@ const ChordLibrary: React.FC = () => {
   const [showToast, setShowToast] = useState(false);
 
   // Refresh chords when localStorage changes
-  const refreshChords = () => {
+  const refreshChords = React.useCallback(() => {
     const saved = localStorage.getItem('customChords');
-    setCustomChords(saved ? JSON.parse(saved) : []);
-  };
+    if (saved) {
+      const chords = JSON.parse(saved);
+      const convertedChords = chords.map(convertChordData);
+      
+      // Save the converted data back to localStorage
+      localStorage.setItem('customChords', JSON.stringify(convertedChords));
+      
+      // Update the state
+      setCustomChords(convertedChords);
+    }
+  }, [convertChordData]);
 
   // Listen for storage events (when chords are added from other tab)
   React.useEffect(() => {
@@ -197,13 +343,25 @@ const ChordLibrary: React.FC = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const deleteChord = (id: string) => {
-    const updatedChords = customChords.filter(chord => chord.id !== id);
-    setCustomChords(updatedChords);
-    localStorage.setItem('customChords', JSON.stringify(updatedChords));
-  };
+  // Refresh chords when sharp/flat preference changes
+  React.useEffect(() => {
+    // Permanently convert and save all chord data when preference changes
+    const saved = localStorage.getItem('customChords');
+    if (saved) {
+      const chords = JSON.parse(saved);
+      const convertedChords = chords.map(convertChordData);
+      
+      // Save the converted data back to localStorage
+      localStorage.setItem('customChords', JSON.stringify(convertedChords));
+      
+      // Update the state
+      setCustomChords(convertedChords);
+    }
+  }, [useSharps, convertChordData]);
 
-  const openEditModal = (chord: any) => {
+
+
+  const openEditModal = (chord: Chord) => {
     setEditingChord(chord);
     setEditModalOpen(true);
   };
@@ -213,7 +371,7 @@ const ChordLibrary: React.FC = () => {
     setEditModalOpen(false);
   };
 
-  const saveEditedChord = (editedChord: any) => {
+  const saveEditedChord = (editedChord: Chord) => {
     const updatedChords = customChords.map(chord => 
       chord.id === editedChord.id ? editedChord : chord
     );
@@ -222,11 +380,11 @@ const ChordLibrary: React.FC = () => {
     closeEditModal();
   };
 
-  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map(convertNote);
   const QUALITIES = ['Major', 'Minor', 'Maj7', 'Min7', 'Diminished', 'Augmented', 'Sus2', 'Sus4', '7', '9', '13', 'Power Chord', 'Custom'];
   const VOICINGS = ['Open', 'Barre', 'Power', 'Triad', 'Custom'];
 
-  const filteredChords = customChords.filter((chord) => {
+  const filteredChords = customChords.filter((chord: Chord) => {
     const matchesQuery = searchQuery.trim().length === 0 || (chord.name || '').toLowerCase().includes(searchQuery.toLowerCase());
     const matchesRoot = !filterRoot || chord.rootNote === filterRoot;
     const matchesQuality = !filterQuality || chord.chordQuality === filterQuality;
@@ -234,7 +392,7 @@ const ChordLibrary: React.FC = () => {
     return matchesQuery && matchesRoot && matchesQuality && matchesVoicing;
   });
 
-  const sortedChords = [...filteredChords].sort((a, b) => {
+  const sortedChords = [...filteredChords].sort((a: Chord, b: Chord) => {
     const aName = (a.name || '').toLowerCase();
     const bName = (b.name || '').toLowerCase();
     
@@ -254,48 +412,7 @@ const ChordLibrary: React.FC = () => {
     return aName.localeCompare(bName);
   });
 
-  const getCapoChord = (chordName: string, capoFret: number) => {
-    if (capoFret === 0) return chordName;
-    
-    const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-    
-    // Extract the root note from the chord name
-    let rootNote = '';
-    let chordQuality = '';
-    
-    // Handle different chord naming patterns
-    if (chordName.includes('maj') || chordName.includes('Maj')) {
-      rootNote = chordName.replace('maj', '').replace('Maj', '');
-      chordQuality = 'maj';
-    } else if (chordName.includes('m') || chordName.includes('min')) {
-      rootNote = chordName.replace('m', '').replace('min', '');
-      chordQuality = 'm';
-    } else if (chordName.includes('dim')) {
-      rootNote = chordName.replace('dim', '');
-      chordQuality = 'dim';
-    } else if (chordName.includes('aug')) {
-      rootNote = chordName.replace('aug', '');
-      chordQuality = 'aug';
-    } else if (chordName.includes('7')) {
-      rootNote = chordName.replace('7', '');
-      chordQuality = '7';
-    } else {
-      // Assume major chord if no quality specified
-      rootNote = chordName;
-      chordQuality = '';
-    }
-    
-    // Find the root note index
-    const rootIndex = NOTES.indexOf(rootNote);
-    if (rootIndex === -1) return chordName; // Can't determine, return original
-    
-    // Calculate new root note with capo
-    const newRootIndex = (rootIndex + capoFret) % 12;
-    const newRootNote = NOTES[newRootIndex];
-    
-    // Reconstruct chord name
-    return newRootNote + chordQuality;
-  };
+
 
   const clearFilters = () => {
     setSearchQuery('');
@@ -304,11 +421,11 @@ const ChordLibrary: React.FC = () => {
     setFilterVoicing('');
   };
 
-  const addChordToJam = (chord: any) => {
+  const addChordToJam = (chord: Chord) => {
     const existingJamChords = JSON.parse(localStorage.getItem('jamWorkspace') || '[]');
     
     // Check for duplicates based on name, frets, and position
-    const isDuplicate = existingJamChords.some((existingChord: any) => 
+    const isDuplicate = existingJamChords.some((existingChord: JamChord) => 
       existingChord.name === chord.name &&
       JSON.stringify(existingChord.frets) === JSON.stringify(chord.frets) &&
       existingChord.position === chord.position
@@ -373,8 +490,8 @@ const ChordLibrary: React.FC = () => {
 
         // Merge with existing chords (avoid duplicates by ID)
         const existingChords = JSON.parse(localStorage.getItem('customChords') || '[]');
-        const existingIds = new Set(existingChords.map((c: any) => c.id));
-        const newChords = validChords.filter((chord: any) => !existingIds.has(chord.id));
+                  const existingIds = new Set(existingChords.map((c: Chord) => c.id));
+        const newChords = validChords.filter((chord: Chord) => !existingIds.has(chord.id));
         
         const mergedChords = [...existingChords, ...newChords];
         localStorage.setItem('customChords', JSON.stringify(mergedChords));
@@ -458,7 +575,7 @@ const ChordLibrary: React.FC = () => {
             >
               <option value="">All roots</option>
               {NOTES.map((n) => (
-                <option key={n} value={n}>{n}</option>
+                <option key={n} value={n}>{convertNote(n)}</option>
               ))}
             </select>
             <select
@@ -502,9 +619,9 @@ const ChordLibrary: React.FC = () => {
                 >
                   <div className="flex items-center justify-between mb-3">
                     <div>
-                      <h4 className="font-medium text-gray-900 dark:text-white">{chord.name}</h4>
+                      <h4 className="font-medium text-gray-900 dark:text-white">{convertNote(chord.name)}</h4>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${chord.rootNote} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
+                        {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${convertNote(chord.rootNote)} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
@@ -559,12 +676,12 @@ const ChordLibrary: React.FC = () => {
 };
 
 // Key Selector Component
-const KeySelector: React.FC = () => {
+const KeySelector: React.FC<{ useSharps: boolean; convertNote: (note: string) => string }> = ({ useSharps, convertNote }) => {
   const [selectedKey, setSelectedKey] = useState('');
   const [filterRoot, setFilterRoot] = useState('');
   const [filterQuality, setFilterQuality] = useState('');
   const [filterVoicing, setFilterVoicing] = useState('');
-  const [customChords, setCustomChords] = useState<any[]>(() => {
+  const [customChords, setCustomChords] = useState<Chord[]>(() => {
     const saved = localStorage.getItem('customChords');
     return saved ? JSON.parse(saved) : [];
   });
@@ -585,7 +702,7 @@ const KeySelector: React.FC = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map(convertNote);
   const QUALITIES = ['Major', 'Minor', 'Maj7', 'Min7', 'Diminished', 'Augmented', 'Sus2', 'Sus4', '7', '9', '13', 'Power Chord', 'Custom'];
   const VOICINGS = ['Open', 'Barre', 'Power', 'Triad', 'Custom'];
 
@@ -633,7 +750,7 @@ const KeySelector: React.FC = () => {
     }
 
     const keyChords = musicalKeys[selectedKey as keyof typeof musicalKeys];
-    const chordsInKey: any[] = [];
+    const chordsInKey: Chord[] = [];
 
     keyChords.forEach(chordName => {
       // Find chords that match this chord name
@@ -895,7 +1012,7 @@ const KeySelector: React.FC = () => {
 
 // Saved Jams Tab Component
 const SavedJamsTab: React.FC = () => {
-  const [savedJams, setSavedJams] = useState<any[]>([]);
+  const [savedJams, setSavedJams] = useState<SavedJam[]>([]);
   const [toastMessage, setToastMessage] = useState('');
   const [showToast, setShowToast] = useState(false);
 
@@ -915,7 +1032,7 @@ const SavedJamsTab: React.FC = () => {
     return () => window.removeEventListener('storage', handleStorageChange);
   }, []);
 
-  const loadJam = (jam: any) => {
+  const loadJam = (jam: SavedJam) => {
     // Load the jam into the jam workspace
     localStorage.setItem('jamWorkspace', JSON.stringify(jam.chords));
     
@@ -932,7 +1049,7 @@ const SavedJamsTab: React.FC = () => {
 
   const deleteJam = (jamId: string) => {
     if (window.confirm('Are you sure you want to delete this jam? This action cannot be undone.')) {
-      const updatedJams = savedJams.filter((jam: any) => jam.id !== jamId);
+      const updatedJams = savedJams.filter((jam: SavedJam) => jam.id !== jamId);
       localStorage.setItem('savedJams', JSON.stringify(updatedJams));
       setSavedJams(updatedJams);
       setToastMessage('Jam deleted successfully');
@@ -976,7 +1093,7 @@ const SavedJamsTab: React.FC = () => {
         }
 
         // Validate jam structure
-        const validJams = importedJams.filter((jam: any) =>
+        const validJams = importedJams.filter((jam: SavedJam) =>
           jam.id && jam.name && jam.chords && Array.isArray(jam.chords)
         );
 
@@ -986,8 +1103,8 @@ const SavedJamsTab: React.FC = () => {
 
         // Merge with existing jams (avoid duplicates by ID)
         const existingJams = JSON.parse(localStorage.getItem('savedJams') || '[]');
-        const existingIds = new Set(existingJams.map((j: any) => j.id));
-        const newJams = validJams.filter((jam: any) => !existingIds.has(jam.id));
+        const existingIds = new Set(existingJams.map((j: SavedJam) => j.id));
+        const newJams = validJams.filter((jam: SavedJam) => !existingIds.has(jam.id));
 
         const mergedJams = [...existingJams, ...newJams];
         localStorage.setItem('savedJams', JSON.stringify(mergedJams));
@@ -1057,7 +1174,7 @@ const SavedJamsTab: React.FC = () => {
                 <div>
                   <h4 className="font-medium text-gray-900 dark:text-white">{jam.name}</h4>
                   <div className="text-xs text-gray-500 dark:text-gray-400">
-                    {jam.chords.length} chord{jam.chords.length !== 1 ? 's' : ''} • {new Date(jam.createdAt).toLocaleDateString()}
+                    {jam.chords.length} chord{jam.chords.length !== 1 ? 's' : ''} • {jam.createdAt ? new Date(jam.createdAt).toLocaleDateString() : 'Unknown date'}
                   </div>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -1079,7 +1196,7 @@ const SavedJamsTab: React.FC = () => {
               </div>
               
               <div className="text-xs text-gray-600 dark:text-gray-400 mb-2">
-                {jam.chords.slice(0, 3).map((chord: any) => chord.name).join(' • ')}
+                {jam.chords.slice(0, 3).map((chord: JamChord) => chord.name).join(' • ')}
                 {jam.chords.length > 3 && ' • ...'}
               </div>
             </div>
@@ -1098,7 +1215,7 @@ const SavedJamsTab: React.FC = () => {
 };
 
 // Scale Browser Component
-const ScaleBrowser: React.FC = () => {
+const ScaleBrowser: React.FC<{ useSharps: boolean; convertNote: (note: string) => string }> = ({ useSharps, convertNote }) => {
   const [selectedRoot, setSelectedRoot] = useState('C');
   const [selectedScale, setSelectedScale] = useState('major');
   const [selectedPosition, setSelectedPosition] = useState(1);
@@ -1186,7 +1303,7 @@ const ScaleBrowser: React.FC = () => {
     
     return scale.intervals.map(interval => {
       const noteIndex = (rootIndex + interval) % 12;
-      return NOTES[noteIndex];
+      return convertNote(NOTES[noteIndex]);
     });
   };
 
@@ -1200,8 +1317,8 @@ const ScaleBrowser: React.FC = () => {
     const rootIndex = getNoteIndex(root);
     const scaleNotes = getScaleNotes(root, scaleType);
     
-    // Define string tunings (E, A, D, G, B, E)
-    const stringTunings = ['E', 'A', 'D', 'G', 'B', 'E'];
+    // Define string tunings (E, B, G, D, A, E) - from bottom to top like guitar tabs
+    const stringTunings = ['E', 'B', 'G', 'D', 'A', 'E'];
     
     const fretboard = stringTunings.map((stringNote, stringIndex) => {
       const stringNoteIndex = getNoteIndex(stringNote);
@@ -1212,14 +1329,14 @@ const ScaleBrowser: React.FC = () => {
         const noteIndex = (stringNoteIndex + fret) % 12;
         const note = NOTES[noteIndex];
         
-        if (scaleNotes.includes(note)) {
+        if (scaleNotes.includes(convertNote(note))) {
           // Check if this note is in the current position
           const relativeToRoot = (noteIndex - rootIndex + 12) % 12;
           if (positionData.pattern.includes(relativeToRoot)) {
             frets.push({
-              fret,
-              note,
-              isRoot: note === root,
+              fret: fret,
+              note: convertNote(note),
+              isRoot: convertNote(note) === convertNote(root),
               isInPosition: true
             });
           }
@@ -1240,7 +1357,7 @@ const ScaleBrowser: React.FC = () => {
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
         <div className="text-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {root} {SCALES[scaleType as keyof typeof SCALES]?.name}
+            {convertNote(root)} {SCALES[scaleType as keyof typeof SCALES]?.name}
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Notes: {scaleNotes.join(' - ')} • Frets 0-15
@@ -1255,11 +1372,11 @@ const ScaleBrowser: React.FC = () => {
               <div className="fretboard-cell text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700">
                 String
               </div>
-              {['E', 'A', 'D', 'G', 'B', 'E'].map((note, i) => (
-                <div key={i} className="fretboard-cell text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700">
-                  {note}
-                </div>
-              ))}
+              {['E', 'B', 'G', 'D', 'A', 'E'].map((note, i) => (
+              <div key={i} className="fretboard-cell text-xs font-medium text-gray-600 dark:text-gray-400 bg-gray-100 dark:bg-gray-700">
+    {convertNote(note)}
+  </div>
+))}
             </div>
             
             {/* Fret numbers and notes */}
@@ -1283,7 +1400,7 @@ const ScaleBrowser: React.FC = () => {
                             ? 'bg-teal-600 text-white' 
                             : 'bg-teal-200 dark:bg-teal-800 text-teal-800 dark:text-teal-200'
                         }`}>
-                          {fretData.note}
+                          {convertNote(fretData.note)}
                         </div>
                       )}
                     </div>
@@ -1320,7 +1437,7 @@ const ScaleBrowser: React.FC = () => {
             className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
           >
             {NOTES.map(note => (
-              <option key={note} value={note}>{note}</option>
+              <option key={note} value={note}>{convertNote(note)}</option>
             ))}
           </select>
         </div>
@@ -1391,15 +1508,14 @@ const ScaleBrowser: React.FC = () => {
 };
 
 // Theory Tab Component
-const TheoryTab: React.FC = () => {
+const TheoryTab: React.FC<{ useSharps: boolean; convertNote: (note: string) => string }> = ({ useSharps, convertNote }) => {
   const [selectedKey, setSelectedKey] = useState('');
   const [selectedScale, setSelectedScale] = useState('major');
   const [selectedPosition, setSelectedPosition] = useState(1);
   const [showAllPositions, setShowAllPositions] = useState(false);
-  const [customChords, setCustomChords] = useState<any[]>([]);
-  const [capoFret, setCapoFret] = useState(0);
+  const [customChords, setCustomChords] = useState<Chord[]>([]);
 
-  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map(convertNote);
   
   const SCALES = {
     major: {
@@ -1490,6 +1606,46 @@ const TheoryTab: React.FC = () => {
     return NOTES.indexOf(note);
   };
 
+  // Get fretboard notes for theory tab
+  const getTheoryFretboardNotes = (root: string, scaleType: string, _position: number) => {
+    const rootIndex = getNoteIndex(root);
+    const scale = SCALES[scaleType as keyof typeof SCALES];
+    if (!scale) return [];
+    
+    const stringTunings = ['E', 'A', 'D', 'G', 'B', 'E'];
+    const fretboard = [];
+    
+    for (let stringIndex = 0; stringIndex < stringTunings.length; stringIndex++) {
+      const stringNote = stringTunings[stringIndex];
+      const stringNoteIndex = getNoteIndex(stringNote);
+      const frets = [];
+      
+      for (let fret = 0; fret <= 15; fret++) {
+        const noteIndex = (stringNoteIndex + fret) % 12;
+        const note = NOTES[noteIndex];
+        const isInScale = scale.intervals.includes((noteIndex - rootIndex + 12) % 12);
+        const isRoot = noteIndex === rootIndex;
+        
+        if (isInScale) {
+          frets.push({
+            fret,
+            note,
+            isRoot,
+            isInScale: true
+          });
+        }
+      }
+      
+      fretboard.push({
+        string: stringIndex,
+        note: stringNote,
+        frets
+      });
+    }
+    
+    return fretboard;
+  };
+
   const getScaleNotes = (root: string, scaleType: string) => {
     const rootIndex = getNoteIndex(root);
     const scale = SCALES[scaleType as keyof typeof SCALES];
@@ -1501,53 +1657,13 @@ const TheoryTab: React.FC = () => {
     });
   };
 
-  const getFretboardNotes = (root: string, scaleType: string, position: number) => {
-    const scale = SCALES[scaleType as keyof typeof SCALES];
-    if (!scale) return [];
-    
-    const positionData = scale.positions[position - 1];
-    if (!positionData) return [];
-    
-    const rootIndex = getNoteIndex(root);
-    const scaleNotes = getScaleNotes(root, scaleType);
-    
-    // Define string tunings (E, A, D, G, B, E)
-    const stringTunings = ['E', 'A', 'D', 'G', 'B', 'E'];
-    
-    const fretboard = stringTunings.map((stringNote, stringIndex) => {
-      const stringNoteIndex = getNoteIndex(stringNote);
-      const frets = [];
-      
-      // Check each fret from 0 to 15
-      for (let fret = 0; fret <= 15; fret++) {
-        const noteIndex = (stringNoteIndex + fret) % 12;
-        const note = NOTES[noteIndex];
-        
-        if (scaleNotes.includes(note)) {
-          // Check if this note is in the current position
-          const relativeToRoot = (noteIndex - rootIndex + 12) % 12;
-          if (positionData.pattern.includes(relativeToRoot)) {
-            frets.push({
-              fret,
-              note,
-              isRoot: note === root,
-              isInPosition: true
-            });
-          }
-        }
-      }
-      
-      return { string: stringIndex, frets };
-    });
-    
-    return fretboard;
-  };
+
 
   const getChordsInKey = (key: string) => {
     if (!key || !musicalKeys[key as keyof typeof musicalKeys]) return [];
     
     const keyChords = musicalKeys[key as keyof typeof musicalKeys];
-    const chordsInKey: any[] = [];
+    const chordsInKey: Chord[] = [];
 
     keyChords.forEach(chordName => {
       // Find chords that match this chord name
@@ -1609,14 +1725,14 @@ const TheoryTab: React.FC = () => {
   };
 
   const renderFretboard = (root: string, scaleType: string, position: number) => {
-    const fretboard = getFretboardNotes(root, scaleType, position);
+    const fretboard = getTheoryFretboardNotes(root, scaleType, position);
     const scaleNotes = getScaleNotes(root, scaleType);
     
     return (
       <div className="bg-white dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
         <div className="text-center mb-4">
           <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-            {root} {SCALES[scaleType as keyof typeof SCALES]?.name}
+            {convertNote(root)} {SCALES[scaleType as keyof typeof SCALES]?.name}
           </h3>
           <p className="text-sm text-gray-600 dark:text-gray-400">
             Notes: {scaleNotes.join(' - ')} • Frets 0-15
@@ -1703,7 +1819,6 @@ const TheoryTab: React.FC = () => {
             onChange={(e) => {
               setSelectedKey(e.target.value);
               if (e.target.value) {
-                const keyRoot = getKeyRoot(e.target.value);
                 const keyType = getKeyType(e.target.value);
                 setSelectedScale(keyType);
               }
@@ -1888,14 +2003,14 @@ const TheoryTab: React.FC = () => {
 };
 
 // Jam Workspace Component
-const JamWorkspace: React.FC<{ capoFret: number; setCapoFret: (fret: number) => void }> = ({ capoFret, setCapoFret }) => {
+const JamWorkspace: React.FC<{ capoFret: number; setCapoFret: (fret: number) => void; useSharps: boolean; convertNote: (note: string) => string }> = ({ capoFret, setCapoFret, useSharps, convertNote }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isSearchFocused, setIsSearchFocused] = useState(false);
-  const [selectedChords, setSelectedChords] = useState<any[]>(() => {
+  const [selectedChords, setSelectedChords] = useState<Chord[]>(() => {
     const saved = localStorage.getItem('jamWorkspace');
     return saved ? JSON.parse(saved) : [];
   });
-  const [customChords, setCustomChords] = useState<any[]>(() => {
+  const [customChords, setCustomChords] = useState<Chord[]>(() => {
     const saved = localStorage.getItem('customChords');
     return saved ? JSON.parse(saved) : [];
   });
@@ -1938,9 +2053,7 @@ const JamWorkspace: React.FC<{ capoFret: number; setCapoFret: (fret: number) => 
     return () => window.removeEventListener('storage', handleJamWorkspaceChange);
   }, [setCapoFret]);
 
-  const NOTES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
-  const QUALITIES = ['Major', 'Minor', 'Maj7', 'Min7', 'Diminished', 'Augmented', 'Sus2', 'Sus4', '7', '9', '13', 'Power Chord', 'Custom'];
-  const VOICINGS = ['Open', 'Barre', 'Power', 'Triad', 'Custom'];
+
 
   // Filter chords based on search query
   const filteredChords = customChords.filter((chord) => {
@@ -1970,10 +2083,10 @@ const JamWorkspace: React.FC<{ capoFret: number; setCapoFret: (fret: number) => 
     return aName.localeCompare(bName);
   });
 
-  const addChordToWorkspace = (chord: any) => {
+  const addChordToWorkspace = (chord: Chord) => {
     setSelectedChords(prev => {
       // Check for duplicates based on name, frets, and position
-      const isDuplicate = prev.some((existingChord: any) => 
+      const isDuplicate = prev.some((existingChord: Chord) => 
         existingChord.name === chord.name &&
         JSON.stringify(existingChord.frets) === JSON.stringify(chord.frets) &&
         existingChord.position === chord.position
@@ -2036,26 +2149,7 @@ const JamWorkspace: React.FC<{ capoFret: number; setCapoFret: (fret: number) => 
     setJamName('');
   };
 
-  const loadJam = (jam: any) => {
-    setSelectedChords(jam.chords);
-    localStorage.setItem('jamWorkspace', JSON.stringify(jam.chords));
-    
-    // Restore capo state if it was saved with the jam
-    if (jam.capoFret !== undefined) {
-      setCapoFret(jam.capoFret);
-    }
-    
-    setToastMessage(`Loaded jam "${jam.name}"`);
-    setShowToast(true);
-  };
 
-  const deleteJam = (jamId: string) => {
-    const savedJams = JSON.parse(localStorage.getItem('savedJams') || '[]');
-    const updatedJams = savedJams.filter((jam: any) => jam.id !== jamId);
-    localStorage.setItem('savedJams', JSON.stringify(updatedJams));
-    setToastMessage('Jam deleted successfully');
-    setShowToast(true);
-  };
 
   const getCapoChord = (chordName: string, capoFret: number) => {
     if (capoFret === 0) return chordName;
@@ -2208,9 +2302,9 @@ const JamWorkspace: React.FC<{ capoFret: number; setCapoFret: (fret: number) => 
                       }}
                     >
                       <div className="flex-1">
-                        <div className="font-medium text-gray-900 dark:text-white">{chord.name}</div>
+                        <div className="font-medium text-gray-900 dark:text-white">{convertNote(chord.name)}</div>
                         <div className="text-sm text-gray-500 dark:text-gray-400">
-                          {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${chord.rootNote} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
+                          {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${convertNote(chord.rootNote)} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
                         </div>
                       </div>
                       <div className="ml-3 px-2 py-1 bg-teal-600 text-white rounded text-xs">
@@ -2362,8 +2456,8 @@ const JamWorkspace: React.FC<{ capoFret: number; setCapoFret: (fret: number) => 
 
 // Edit Chord Modal Component
 interface EditChordModalProps {
-  chord: any;
-  onSave: (chord: any) => void;
+  chord: Chord;
+  onSave: (chord: Chord) => void;
   onClose: () => void;
 }
 
@@ -2373,7 +2467,6 @@ const EditChordModal: React.FC<EditChordModalProps> = ({ chord, onSave, onClose 
   const [editChordQuality, setEditChordQuality] = useState(chord.chordQuality || '');
   const [editChordVoicing, setEditChordVoicing] = useState(chord.chordVoicing || '');
   const [editPosition, setEditPosition] = useState(chord.position);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   const handleSave = () => {
     if (!editName.trim()) {
@@ -2412,7 +2505,7 @@ const EditChordModal: React.FC<EditChordModalProps> = ({ chord, onSave, onClose 
     if (window.confirm('Are you sure you want to delete this chord? This action cannot be undone.')) {
       // Find the parent component's deleteChord function
       const customChords = JSON.parse(localStorage.getItem('customChords') || '[]');
-      const updatedChords = customChords.filter((c: any) => c.id !== chord.id);
+      const updatedChords = customChords.filter((c: Chord) => c.id !== chord.id);
       localStorage.setItem('customChords', JSON.stringify(updatedChords));
       
       // Close modal and trigger a page refresh to update the chord library

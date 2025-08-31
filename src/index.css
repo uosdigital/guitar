@@ -2,6 +2,29 @@
 @tailwind components;
 @tailwind utilities;
 
+/* Electron app spacing - ensure content doesn't overlap with title bar */
+body {
+  padding-top: 0;
+  margin: 0;
+}
+
+/* Ensure the root container has proper spacing */
+#root {
+  min-height: 100vh;
+  padding-top: 0;
+}
+
+/* Add safe area for Electron title bar */
+.electron-safe-area {
+  padding-top: env(safe-area-inset-top, 0px);
+}
+
+/* Ensure header has proper spacing from title bar */
+.app-header {
+  margin-top: 0;
+  padding-top: 1rem; /* Add top padding to separate from title bar */
+}
+
 /* Custom animations for toast */
 @keyframes slide-in-from-right {
   from {

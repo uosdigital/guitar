@@ -12,7 +12,7 @@ interface CustomChord {
   position: number;
 }
 
-export const CustomChordBuilder: React.FC = () => {
+export const CustomChordBuilder: React.FC<{ useSharps?: boolean; convertNote?: (note: string) => string }> = ({ useSharps, convertNote }) => {
   const [chordName, setChordName] = useState('');
   const [rootNote, setRootNote] = useState('');
   const [chordQuality, setChordQuality] = useState('');
@@ -175,7 +175,7 @@ export const CustomChordBuilder: React.FC = () => {
                     >
                       <option value="">Select root note</option>
                       {['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'].map(note => (
-                        <option key={note} value={note}>{note}</option>
+                        <option key={note} value={note}>{convertNote ? convertNote(note) : note}</option>
                       ))}
                     </select>
                   </div>
@@ -191,7 +191,7 @@ export const CustomChordBuilder: React.FC = () => {
                       className="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-2 focus:ring-teal-500 focus:border-teal-500 bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                     >
                       <option value="">Select quality</option>
-                      {['Major', 'Minor', 'Maj7', 'Min7', 'Diminished', 'Augmented', 'Sus2', 'Sus4', '7', '9', '13', 'Power Chord', 'Custom'].map(quality => (
+                      {['Major', 'Minor', 'Maj7', 'Min7', 'Diminished', 'Augmented', 'Sus2', 'Sus4', '7', '9', '13', 'Add9', 'Power Chord', 'Custom'].map(quality => (
                         <option key={quality} value={quality}>{quality}</option>
                       ))}
                     </select>
