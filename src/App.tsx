@@ -621,7 +621,9 @@ const ChordLibrary: React.FC<{ useSharps: boolean; convertNote: (note: string) =
                     <div>
                       <h4 className="font-medium text-gray-900 dark:text-white">{convertNote(chord.name)}</h4>
                       <div className="text-xs text-gray-500 dark:text-gray-400">
-                        {chord.rootNote && chord.chordQuality && chord.chordVoicing ? `${convertNote(chord.rootNote)} ${chord.chordQuality} (${chord.chordVoicing})` : 'Custom Chord'}
+                        {chord.rootNote && chord.chordQuality && chord.chordVoicing ? 
+                          `${convertNote(chord.rootNote.length <= 2 ? chord.rootNote : chord.name.replace(chord.chordQuality, '').trim())} ${chord.chordQuality} (${chord.chordVoicing})` : 
+                          'Custom Chord'}
                       </div>
                     </div>
                     <div className="flex items-center space-x-2">
